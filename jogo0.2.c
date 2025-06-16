@@ -147,6 +147,8 @@ void centraliza(coordenadas local, FILE *mapa)
 
 int main(void)
 {
+    //posição inicial
+    Vector2 position = { 0.0f, 0.0f };
     FILE *mapa = fopen("world.txt", "r+");
     if(!mapa)
     {
@@ -168,27 +170,54 @@ int main(void)
     Texture2D player_spr = LoadTexture("Sprites/Player/felix.png");
     Texture2D parede_spr = LoadTexture("Sprites/cenario/parede.png");
     Texture2D caixa_spr = LoadTexture("Sprites/cenario/caixa.png");
+    Texture2D parede_destrutivel_spr = LoadTexture("Sprites/cenario/parede_destrutivel.png");
+    Texture2D bau_spr = LoadTexture("Sprites/interagiveis/bau.png");
+    Texture2D chave_spr = LoadTexture("Sprites/interagiveis/chave.png");
+    Texture2D chao_spr = LoadTexture("Sprites/cenario/chao.png");
 
     //segundo o site oficial, checa se a textura e valida e esta carregada na GPU, retorna TRUE 
-     if (!IsTextureValid(player_spr))
+    if (!IsTextureValid(player_spr))
     {
         printf("Não foi possível achar o sprite do felix. PROCURE O FELIX!\n");
         CloseWindow();
         return 1;    
     }
-         if (!IsTextureValid(parede_spr))
+        if (!IsTextureValid(parede_spr))
     {
         printf("Não foi possível achar o sprite da parede.\n");
         CloseWindow();
         return 1;    
     }
-             if (!IsTextureValid(caixa_spr))
+            if (!IsTextureValid(parede_destrutivel_spr))
     {
-        printf("Não foi possível achar o sprite da parede.\n");
+        printf("Não foi possível achar o sprite da parede destrutivel.\n");
         CloseWindow();
         return 1;    
     }
-
+        if (!IsTextureValid(caixa_spr))
+    {
+        printf("Não foi possível achar o sprite da caixa.\n");
+        CloseWindow();
+        return 1;    
+    }
+        if (!IsTextureValid(bau_spr))
+    {
+        printf("Não foi possível achar o sprite do bau.\n");
+        CloseWindow();
+        return 1;    
+    }
+        if (!IsTextureValid(chave_spr))
+    {
+        printf("Não foi possível achar o sprite da chave.\n");
+        CloseWindow();
+        return 1;    
+    }
+        if (!IsTextureValid(chao_spr))
+    {
+        printf("Não foi possível achar o sprite do chao.\n");
+        CloseWindow();
+        return 1;    
+    }
 
     SetTargetFPS(60);
     while(!WindowShouldClose())
@@ -205,9 +234,17 @@ int main(void)
 
         BeginDrawing();
             ClearBackground(RAYWHITE);
+            //adicionando textura no chao inteiro
+            //primeiro eu crio um triangulo do tamanho da tela
+            Rectangle sourceRec = { 0.0f, 0.0f, LARGURA, 500 }; // o motivo de ser 500 e não ALTURA e pq ali em baixo fica a hud ne, se quiser entender melhor troca isso para "ALTURA"
+            //esse código desenha o sprite no retangulo criado. Como o sprite(tam: 20x20) é bem menor que o retangulo (tam: tela), ele vai preenchendo até cobrir tudo
+            DrawTextureRec(chao_spr, sourceRec, position, WHITE);
+
+
             char objeto = fgetc(mapa);
             while(!feof(mapa))
             {
+
                 switch(objeto)
                 {
                     case PAREDE:
@@ -215,7 +252,7 @@ int main(void)
                     break;
 
                     case DESTRUTIVEL:
-                    DrawRectangle(pixel.x, pixel.y, 20, 20, BLUE);
+                    DrawTexture(parede_destrutivel_spr, pixel.x, pixel.y, WHITE);
                     break;
 
                     case CAIXA:
@@ -223,11 +260,11 @@ int main(void)
                     break;
 
                     case BAU:
-                    DrawRectangle(pixel.x, pixel.y, 20, 20, YELLOW);
+                    DrawTexture(bau_spr, pixel.x, pixel.y, WHITE);
                     break;
 
                     case CHAVE:
-                    DrawRectangle(pixel.x, pixel.y, 20, 20, PINK);
+                    DrawTexture(chave_spr, pixel.x, pixel.y, WHITE);
                 }
                 pixel.x += 20;
                 if(pixel.x/1220)
@@ -247,7 +284,11 @@ int main(void)
     //Necessário para descarregar as texturas
     UnloadTexture(player_spr);
     UnloadTexture(parede_spr);
+    UnloadTexture(parede_destrutivel_spr);
     UnloadTexture(caixa_spr);
+    UnloadTexture(bau_spr);
+    UnloadTexture(chave_spr);
+    UnloadTexture(chao_spr);
 
     fclose(mapa);
     CloseWindow();
