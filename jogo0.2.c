@@ -1,3 +1,10 @@
+/*Gabriel Felix Hilleshein - 124047790
+Gabriel Henzel Diniz Costa - 124171450
+Laísa Tatiana Oliveira de Medeiros - 124225429
+Luiz Vitor Vieira de Mattos- 124280314
+Pedro de Oliveira Bokel Zborowski - 124176573
+Thiago Barbosa da Silva - 124247625*/
+
 #include "raylib.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,15 +33,18 @@ typedef struct
     char vidas;
     char bombas;
     int pontos;
+    int direcao; //(0, 1, 2, 3) = (cima, direita, baixo, esquerda) essa é a maneira provisoria de implementar, se virar permanente devo colocar os defines la em cima
 } jogador;
 
 typedef struct
 {
     coordenadas local;
+    int direcao;
 } inimigo;
 
-void andardireita(coordenadas *local, FILE *mapa)
+void andardireita(coordenadas *local, int *direcao, FILE *mapa)
 {
+    *direcao = 1;
     char objeto = fgetc(mapa);
     if(fgetc(mapa) == LIVRE)
     {
@@ -47,8 +57,9 @@ void andardireita(coordenadas *local, FILE *mapa)
     fseek(mapa, -2*sizeof(char), SEEK_CUR);
 }
 
-void andaresquerda(coordenadas *local, FILE *mapa)
+void andaresquerda(coordenadas *local, int *direcao, FILE *mapa)
 {
+    *direcao = 3;
     fseek(mapa, -sizeof(char), SEEK_CUR);
     if(fgetc(mapa) == LIVRE)
     {
@@ -61,8 +72,9 @@ void andaresquerda(coordenadas *local, FILE *mapa)
     }
 }
 
-void andarcima(coordenadas *local, FILE *mapa)
+void andarcima(coordenadas *local, int *direcao, FILE *mapa)
 {
+    *direcao = 0;
     char objeto = fgetc(mapa);
     fseek(mapa, -63*sizeof(char), SEEK_CUR);
     if(fgetc(mapa) == LIVRE)
@@ -77,8 +89,9 @@ void andarcima(coordenadas *local, FILE *mapa)
     fseek(mapa, 61*sizeof(char), SEEK_CUR);
 }
 
-void andarbaixo(coordenadas *local, FILE *mapa)
+void andarbaixo(coordenadas *local, int *direcao, FILE *mapa)
 {
+    *direcao = 2;
     char objeto = fgetc(mapa);
     fseek(mapa, 61*sizeof(char), SEEK_CUR);
     if(fgetc(mapa) == LIVRE)
@@ -93,7 +106,7 @@ void andarbaixo(coordenadas *local, FILE *mapa)
     fseek(mapa, -63*sizeof(char), SEEK_CUR);
 }
 
-void soltarbomba(coordenadas local, char *bombas, char *informacoes, FILE *mapa)
+void soltarbomba(int direcao, coordenadas local, char *bombas, char *informacoes, FILE *mapa)
 {
     if(*bombas != '0')
     {
@@ -160,6 +173,7 @@ int main(void)
     bomberman.vidas = '3';
     bomberman.bombas = '3';
     bomberman.pontos = 0;
+    bomberman.direcao = 1;
     encontra(JOGADOR, &bomberman.local, mapa);
 
     char informacoes[50] = "Bombas: 3     Vidas: 3     Pontos: 0";
@@ -216,11 +230,11 @@ int main(void)
     while(!WindowShouldClose())
     {
         centraliza(bomberman.local, mapa);
-        if(IsKeyPressed(KEY_RIGHT)) andardireita(&bomberman.local, mapa);
-        if(IsKeyPressed(KEY_LEFT)) andaresquerda(&bomberman.local, mapa);
-        if(IsKeyPressed(KEY_UP)) andarcima(&bomberman.local, mapa);
-        if(IsKeyPressed(KEY_DOWN)) andarbaixo(&bomberman.local, mapa);
-        if(IsKeyPressed(KEY_B)) soltarbomba(bomberman.local, &bomberman.bombas, informacoes, mapa);
+        if(IsKeyPressed(KEY_RIGHT)) andardireita(&bomberman.local, &bomberman.direcao, mapa);
+        if(IsKeyPressed(KEY_LEFT)) andaresquerda(&bomberman.local, &bomberman.direcao, mapa);
+        if(IsKeyPressed(KEY_UP)) andarcima(&bomberman.local, &bomberman.direcao, mapa);
+        if(IsKeyPressed(KEY_DOWN)) andarbaixo(&bomberman.local, &bomberman.direcao, mapa);
+        if(IsKeyPressed(KEY_B)) soltarbomba(bomberman.direcao, bomberman.local, &bomberman.bombas, informacoes, mapa);
         if(IsKeyPressed(KEY_K)) perdevida(&bomberman.vidas , informacoes);
         rewind(mapa);
         coordenadas pixel = {0, 0};
@@ -267,7 +281,19 @@ int main(void)
                 }
                 objeto = fgetc(mapa);
             }
-        
+            /*switch(bomberman.direcao)
+            {
+                case 0:
+                break;
+
+                case 1:
+                break;
+
+                case 2:
+                break;
+
+                case 3:
+            }*/
             DrawTexture(player_spr, bomberman.local.x, bomberman.local.y, WHITE);
             // código antigo: DrawRectangle(bomberman.local.x, bomberman.local.y, 20, 20, RED);
             DrawText(informacoes, 20, 520, 60, GREEN);
@@ -284,6 +310,5 @@ int main(void)
 
     fclose(mapa);
     CloseWindow();
-    printf("%s", informacoes);
     return 0;
 }
