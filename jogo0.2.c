@@ -171,7 +171,6 @@ int main(void)
     Texture2D parede_spr = LoadTexture("Sprites/cenario/parede.png");
     Texture2D caixa_spr = LoadTexture("Sprites/cenario/caixa.png");
     Texture2D parede_destrutivel_spr = LoadTexture("Sprites/cenario/parede_destrutivel.png");
-    Texture2D bau_spr = LoadTexture("Sprites/interagiveis/bau.png");
     Texture2D chave_spr = LoadTexture("Sprites/interagiveis/chave.png");
     Texture2D chao_spr = LoadTexture("Sprites/cenario/chao.png");
 
@@ -197,12 +196,6 @@ int main(void)
         if (!IsTextureValid(caixa_spr))
     {
         printf("Não foi possível achar o sprite da caixa.\n");
-        CloseWindow();
-        return 1;    
-    }
-        if (!IsTextureValid(bau_spr))
-    {
-        printf("Não foi possível achar o sprite do bau.\n");
         CloseWindow();
         return 1;    
     }
@@ -260,7 +253,7 @@ int main(void)
                     break;
 
                     case BAU:
-                    DrawTexture(bau_spr, pixel.x, pixel.y, WHITE);
+                    DrawTexture(caixa_spr, pixel.x, pixel.y, WHITE);
                     break;
 
                     case CHAVE:
@@ -286,7 +279,6 @@ int main(void)
     UnloadTexture(parede_spr);
     UnloadTexture(parede_destrutivel_spr);
     UnloadTexture(caixa_spr);
-    UnloadTexture(bau_spr);
     UnloadTexture(chave_spr);
     UnloadTexture(chao_spr);
 
