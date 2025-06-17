@@ -1,7 +1,7 @@
 WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
 W                                                          W
-W                                           JC             W
-W          E                                               W
+W                                                          W
+W    J     E                                               W
 W                                                          W
 W                                                          W
 W                                                          W
@@ -10,13 +10,13 @@ W                                                          W
 W                                                          W
 W                                                          W
 W                                                          W
-W                       B  K  B                            W
+W         K                     B                          W
 W                                                          W
+W             K               B                            W
+W           B                                              W
 W                                                          W
-W                       K  B                               W
 W                                                          W
 W                                 K                        W
-W                                                          W
 W                                                          W
 W                                                          W
 W                                                          W
