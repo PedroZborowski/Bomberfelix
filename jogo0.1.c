@@ -240,7 +240,7 @@ int main()
 
                 case 3:
             }*/
-            //DrawTexture(player_spr, bomberman.local.x, bomberman.local.y, WHITE);
+            //DrawTexture(player_down_spr, bomberman.local.x, bomberman.local.y, WHITE);
             scanf("%d", &testando);
     }
     return 0;

@@ -191,7 +191,11 @@ int main()
     InitWindow(WIDTH*METERS, HEIGHT*METERS, "Felix Bomberman");
 
     //código abaixo para carregar as sprites. Extremamente importante esse código estar depois do initwindow
-    Texture2D player_spr = LoadTexture("Sprites/Player/felix.png");
+    Texture2D player_down_spr = LoadTexture("Sprites/Player/Felix_down.png");
+    Texture2D player_up_spr = LoadTexture("Sprites/Player/Felix_up.png");
+    Texture2D player_left_spr = LoadTexture("Sprites/Player/Felix_left.png");
+    Texture2D player_right_spr = LoadTexture("Sprites/Player/Felix_right.png");
+
     Texture2D wall_spr = LoadTexture("Sprites/cenario/parede.png");
     Texture2D box_spr = LoadTexture("Sprites/cenario/caixa.png");
     Texture2D explosible_spr = LoadTexture("Sprites/cenario/parede_destrutivel.png");
@@ -199,9 +203,27 @@ int main()
     Texture2D floor_spr = LoadTexture("Sprites/cenario/chao.png");
 
     //segundo o site oficial, checa se a textura e valida e esta carregada na GPU, retorna TRUE 
-    if(!IsTextureValid(player_spr))
+    if(!IsTextureValid(player_down_spr) )
     {
-        puts("ERRO - Nao foi possivel achar o sprite do felix. PROCURE O FELIX!");
+        puts("ERRO - Nao foi possivel achar o sprite do Felix_down.");
+        CloseWindow();
+        return 1;    
+    }
+        if(!IsTextureValid(player_up_spr) )
+    {
+        puts("ERRO - Nao foi possivel achar o sprite do Felix_up.");
+        CloseWindow();
+        return 1;    
+    }
+        if(!IsTextureValid(player_right_spr) )
+    {
+        puts("ERRO - Nao foi possivel achar o sprite do Felix_right.");
+        CloseWindow();
+        return 1;    
+    }
+        if(!IsTextureValid(player_left_spr) )
+    {
+        puts("ERRO - Nao foi possivel achar o sprite do Felix_left.");
         CloseWindow();
         return 1;    
     }
@@ -282,26 +304,34 @@ int main()
                     }
                 }
             }
-            /*switch(bomberman.direction)
+            switch(bomberman.direction)
             {
                 case UP:
+                DrawTexture(player_up_spr, bomberman.local.x*METERS, bomberman.local.y*METERS, WHITE);
                 break;
 
                 case RIGHT:
+                DrawTexture(player_right_spr, bomberman.local.x*METERS, bomberman.local.y*METERS, WHITE);
                 break;
 
                 case DOWN:
+                DrawTexture(player_down_spr, bomberman.local.x*METERS, bomberman.local.y*METERS, WHITE);
                 break;
 
                 case LEFT:
-            }*/
-            DrawTexture(player_spr, bomberman.local.x*METERS, bomberman.local.y*METERS, WHITE);
+                DrawTexture(player_left_spr, bomberman.local.x*METERS, bomberman.local.y*METERS, WHITE);
+                break;
+            }
+
             DrawText(information, 20, 520, 60, GREEN);
         EndDrawing();
     }
 
     //Necessário para descarregar as texturas
-    UnloadTexture(player_spr);
+    UnloadTexture(player_down_spr);
+    UnloadTexture(player_up_spr);
+    UnloadTexture(player_right_spr);
+    UnloadTexture(player_left_spr);
     UnloadTexture(wall_spr);
     UnloadTexture(explosible_spr);
     UnloadTexture(box_spr);
