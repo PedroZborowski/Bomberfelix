@@ -46,46 +46,45 @@ typedef struct
 typedef struct
 {
     coordinates local;
-    int direction;
 } enemy;
 
-void walk_up(coordinates *local, int **world)
+void walk_up(coordinates *local, char **world)
 {
     local->direction = UP;
-    if(!*(*(world + local->y - 1) + local->x))
+    if(*(*(world + local->y - 1) + local->x) == FREE)
     {
         local->y -= 1;
     }
 }
 
-void walk_right(coordinates *local, int **world)
+void walk_right(coordinates *local, char **world)
 {
     local->direction = RIGHT;
-    if(!*(*(world + local->y) + local->x + 1))
+    if(*(*(world + local->y) + local->x + 1) == FREE)
     {
         local->x += 1;
     }
 }
 
-void walk_down(coordinates *local, int **world)
+void walk_down(coordinates *local, char **world)
 {
     local->direction = DOWN;
-    if(!*(*(world + local->y + 1) + local->x))
+    if(*(*(world + local->y + 1) + local->x) == FREE)
     {
         local->y += 1;
     }
 }
 
-void walk_left(coordinates *local, int **world)
+void walk_left(coordinates *local, char **world)
 {
     local->direction = LEFT;
-    if(!*(*(world + local->y) + local->x - 1))
+    if(*(*(world + local->y) + local->x - 1) == FREE)
     {
         local->x -= 1;
     }
 }
 
-void put_bomb(player *bomberman, char *information/*, int **world*/)
+void put_bomb(player *bomberman, char *information/*, char **world*/)
 {
     if(bomberman->bombs != '0')
     {
@@ -94,63 +93,31 @@ void put_bomb(player *bomberman, char *information/*, int **world*/)
     }
 }
 
-int **start_game(char *level, player *bomberman, char *information)
+void update_information(char *information, player bomberman)
 {
-    FILE *file = fopen(level, "r+");
+    information[8] = bomberman.bombs;
+    information[21] = bomberman.lifes;
+    information[35] = '0';
+}
+
+void new_game(player *bomberman, char **world)
+{
+    FILE *file = fopen("world.txt", "r");
     if(!file)
     {
         puts("ERRO - O nivel nao pode ser aberto");
-        return NULL;
-    }
-
-    int **world = (int **)malloc(STATURE*sizeof(int *));
-    if(!world)
-    {
-        puts("ERRO - A memoria nao pode ser alocada");
-        return NULL;
-    }
-    for(int y = 0; y < STATURE; y++)
-    {
-        *(world + y) = (int *)malloc(WIDTH*sizeof(int));
-        if(!*(world + y))
-        {
-            puts("ERRO - A memoria nao pode ser alocada");
-            return NULL;
-        }
     }
 
     bomberman->lifes = '3';
     bomberman->bombs = '3';
     bomberman->points = 0;
-    bomberman->local.direction = RIGHT;
-    strcpy(information, "Bombas: 3     Vidas: 3     Pontos: 0");
-
+    bomberman->local.direction = DOWN;
     coordinates squares = {0, 0, 0};
     char object = fgetc(file);
     while(!feof(file))
     {
         switch(object)
         {
-            case FREE:
-            *(*(world + squares.y) + squares.x) = 0;
-            break;
-
-            case WALL:
-            *(*(world + squares.y) + squares.x) = 1;
-            break;
-
-            case EXPLOSIBLE:
-            *(*(world + squares.y) + squares.x) = 2;
-            break;
-
-            case EMPTY_BOX:
-            *(*(world + squares.y) + squares.x) = 3;
-            break;
-
-            case KEY_BOX:
-            *(*(world + squares.y) + squares.x) = 4;
-            break;
-
             case '\n':
             squares.x -= 1;
             break;
@@ -158,7 +125,11 @@ int **start_game(char *level, player *bomberman, char *information)
             case PLAYER:
             bomberman->local.x = squares.x;
             bomberman->local.y = squares.y;
-            *(*(world + squares.y) + squares.x) = 0;
+            *(*(world + squares.y) + squares.x) = FREE;
+            break;
+
+            default:
+            *(*(world + squares.y) + squares.x) = object;
         }
         squares.x += 1;
         if(squares.x/WIDTH)
@@ -169,30 +140,90 @@ int **start_game(char *level, player *bomberman, char *information)
         object = fgetc(file);
     }
     fclose(file);
-    return world;
 }
 
-void save_game();
 
-void pause(char *level, player *bomberman, char information[])
+void load_game(player *bomberman, char **world)
+{
+    FILE *file = fopen("save.dat", "rb");
+    if(!file)
+    {
+        puts("ERRO - O save nao pode ser aberto");
+    }
+    else
+    {
+        puts("Jogo carregado com sucesso");
+    }
+    coordinates squares = {0, 0, 0};
+    char object;
+    fread(&object, sizeof(char), 1, file);
+    while(object != '\n')
+    {
+        *(*(world + squares.y) + squares.x) = object;
+        squares.x += 1;
+        if(squares.x/WIDTH)
+        {
+            squares.x = 0;
+            squares.y += 1;
+        }
+        fread(&object, sizeof(char), 1, file);
+    }
+    fread(bomberman, sizeof(player), 1, file);
+
+    fclose(file);
+}
+
+void save_game(player bomberman, char **world)
+{
+    FILE *file = fopen("save.dat", "wb");
+    if(!file)
+    {
+        puts("ERRO - O jogo nao pode ser salvo");
+    }
+    else
+    {
+        puts("Jogo salvo com sucesso");
+    }
+
+    for(int y = 0; y < STATURE; y++)
+    {
+        for(int x = 0; x < WIDTH; x++)
+        {
+            fwrite(*(world + y) + x, sizeof(char), 1, file);
+        }
+    }
+    char split = '\n';
+    fwrite(&split, sizeof(char), 1, file);
+    fwrite(&bomberman, sizeof(player), 1, file);
+
+    fclose(file);
+}
+
+void pause(player *bomberman, char information[], char **world)
 {
     while(!IsKeyPressed(KEY_V))
     {
         if(IsKeyPressed(KEY_N))
         {
-            start_game(level, bomberman, information);
+            new_game(bomberman, world);
             break;
         }
-        //if(IsKeyPressed(KEY_C));
-        //if(IsKeyPressed(KEY_S));
+        if(IsKeyPressed(KEY_C))
+        {
+            load_game(bomberman, world);
+            update_information(information, *bomberman);
+            break;
+        }
+        if(IsKeyPressed(KEY_S)) save_game(*bomberman, world);
         if(IsKeyPressed(KEY_Q)) CloseWindow();
+        if(WindowShouldClose()) CloseWindow();
         BeginDrawing();
             DrawText("PAUSE", 130, 220, 150, RED);
         EndDrawing();
     }
 }
 
-void lose_life(player *bomberman ,char *information)
+void lose_life(player *bomberman ,char *information, char **world)
 {
     bomberman->lifes -= 1;
     information[21] = bomberman->lifes;
@@ -201,30 +232,35 @@ void lose_life(player *bomberman ,char *information)
         while(!IsKeyPressed(KEY_N))
         {
             if(IsKeyPressed(KEY_Q)) CloseWindow();
-            //if(IsKeyPressed(KEY_C));
+            if(WindowShouldClose()) CloseWindow();
+            if(IsKeyPressed(KEY_C))
+            {
+                load_game(bomberman, world);
+                update_information(information, *bomberman);
+            }
             DrawRectangle(620, 520, 60, 60, RAYWHITE);
             DrawText("0", 640, 520, 60, GREEN);
             BeginDrawing();
                 DrawText("GAME OVER", 130, 220, 150, RED);
             EndDrawing();
         }
-        start_game("world.txt", bomberman, information);
+        new_game(bomberman, world);
     }
 }
 
 int main()
 {
+    int check = 2;
     InitWindow(WIDTH*METERS, HEIGHT*METERS, "Felix Bomberman");
-
-    for(int i = 0;!WindowShouldClose();)
+    while(!WindowShouldClose())
     {
-        if(IsKeyPressed(KEY_UP)) i = (i+1)%3;
-        if(IsKeyPressed(KEY_DOWN)) i = (i+2)%3;
+        if(IsKeyPressed(KEY_UP)) check = (check+1)%3;
+        if(IsKeyPressed(KEY_DOWN)) check = (check+2)%3;
         if(IsKeyPressed(KEY_ENTER))
         {
-            if(i == 2) break;
-            if(i == 1) puts("carregar jogo ainda n ta pronto D:");
-            if(i == 0) CloseWindow();
+            if(check == 2) break;
+            if(check == 1) break;
+            if(check == 0) CloseWindow();
         }
 
         BeginDrawing();
@@ -233,17 +269,38 @@ int main()
             DrawText("Novo jogo", 130, 200, 70, BLACK);
             DrawText("Carregar jogo", 130, 300, 70, BLACK);
             DrawText("Sair", 130, 400, 70, BLACK);
-            DrawRectangle(70, (-100*i) + 400, 50, 50, RED);
+            DrawRectangle(70, (-100*check) + 400, 50, 50, RED);
         EndDrawing();
     }
 
     player bomberman;
-    char information[50];
-    int **world = start_game("world.txt", &bomberman, information);
+    char information[50] = "Bombas: X     Vidas: X     Pontos: X";
+    char **world = (char **)malloc(STATURE*sizeof(char *));
     if(!world)
     {
+        puts("ERRO - A memoria nao pode ser alocada");
+        CloseWindow();
         return -1;
     }
+    for(int y = 0; y < STATURE; y++)
+    {
+        *(world + y) = (char *)malloc(WIDTH*sizeof(char));
+        if(!*(world + y))
+        {
+            puts("ERRO - A memoria nao pode ser alocada");
+            CloseWindow();
+            return -1;
+        }
+    }
+
+    if(check == 2) new_game(&bomberman, world);
+    if(check == 1) load_game(&bomberman, world);
+    if(!world)
+    {
+        CloseWindow();
+        return -1;
+    }
+    update_information(information, bomberman);
 
     //código abaixo para carregar as sprites. Extremamente importante esse código estar depois do initwindow
     Texture2D player_down_spr = LoadTexture("Sprites/Player/Felix_down.png");
@@ -323,8 +380,8 @@ int main()
         if(IsKeyPressed(KEY_UP)) walk_up(&bomberman.local, world);
         if(IsKeyPressed(KEY_DOWN)) walk_down(&bomberman.local, world);
         if(IsKeyPressed(KEY_B)) put_bomb(&bomberman, information/*, world*/);
-        if(IsKeyPressed(KEY_K)) lose_life(&bomberman , information);
-        if(IsKeyPressed(KEY_TAB)) pause("world.txt", &bomberman, information);
+        if(IsKeyPressed(KEY_K)) lose_life(&bomberman , information, world);
+        if(IsKeyPressed(KEY_TAB)) pause(&bomberman, information, world);
 
         BeginDrawing();
             ClearBackground(RAYWHITE);
@@ -339,19 +396,19 @@ int main()
                 {
                     switch(*(*(world + y) + x))
                     {
-                        case 1:
+                        case WALL:
                         DrawTexture(wall_spr, x*METERS, y*METERS, WHITE);
                         break;
 
-                        case 2:
+                        case EXPLOSIBLE:
                         DrawTexture(explosible_spr, x*METERS, y*METERS, WHITE);
                         break;
 
-                        case 3:
+                        case EMPTY_BOX:
                         DrawTexture(box_spr, x*METERS, y*METERS, WHITE);
                         break;
 
-                        case 4:
+                        case KEY_BOX:
                         DrawTexture(box_spr, x*METERS, y*METERS, WHITE);
                         break;
 
