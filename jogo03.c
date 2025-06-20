@@ -252,6 +252,67 @@ void lose_life(player *bomberman ,char *information, char **world)
     }
 }
 
+void show_devs()
+{
+    while(!IsKeyPressed(KEY_V))
+    {
+        if(WindowShouldClose()) CloseWindow();
+        BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawText("DESENVOLVEDORES", 250, 0, 50, RED);
+            DrawText("Gabriel Felix Hilleshein - 124047790", 65, 100, 40, RED);
+            DrawText("Gabriel Henzel Diniz Costa - 124171450", 65, 170, 40, RED);
+            DrawText("Laísa Tatiana Oliveira de Medeiros - 124225429", 65, 240, 40, RED);
+            DrawText("Luiz Vitor Vieira de Mattos- 124280314", 65, 310, 40, RED);
+            DrawText("Pedro de Oliveira Bokel Zborowski - 124176573", 65, 380, 40, RED);
+            DrawText("Thiago Barbosa da Silva - 124247625", 65, 450, 40, RED);
+        EndDrawing();
+    }
+}
+
+void records()
+{
+    while(!IsKeyPressed(KEY_V))
+    {
+        if(WindowShouldClose()) CloseWindow();
+        BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawText("RECORDS", 50, 10, 50, RED);
+            DrawText("Nome do jogador | pontuação", 350, 15, 40, RED);
+            DrawText("1º ---------- | 0", 40, 100, 50, BLACK);
+            DrawText("2º ---------- | 0", 40, 200, 50, BLACK);
+            DrawText("3º ---------- | 0", 40, 300, 50, BLACK);
+            DrawText("4º ---------- | 0", 40, 400, 50, BLACK);
+            DrawText("5º ---------- | 0", 40, 500, 50, BLACK);
+            DrawText("6º ---------- | 0", 600, 100, 50, BLACK);
+            DrawText("7º ---------- | 0", 600, 200, 50, BLACK);
+            DrawText("8º ---------- | 0", 600, 300, 50, BLACK);
+            DrawText("9º ---------- | 0", 600, 400, 50, BLACK);
+            DrawText("10º ---------- | 0", 600, 500, 50, BLACK);
+        EndDrawing();
+    }
+}
+
+void controls()
+{
+    while(!IsKeyPressed(KEY_V))
+    {
+        if(WindowShouldClose()) CloseWindow();
+        BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawText("CONTROLES", 50, 10, 50, RED);
+            DrawText("ASWD OU SETINHAS - MOVIMENTAÇÃO", 40, 100, 50, BLACK);
+            DrawText("B - SOLTA BOMBA", 40, 200, 50, BLACK);
+            DrawText("TAB - PAUSA", 40, 300, 50, BLACK);
+            DrawText("Q - SAIR DO JOGO", 40, 400, 50, BLACK);
+            DrawText("N - NOVO JOGO", 40, 500, 50, BLACK);
+            DrawText("S - SALVAR", 600, 200, 50, BLACK);
+            DrawText("C - CARREGAR JOGO", 600, 300, 50, BLACK);
+            DrawText("V - VOLTAR", 600, 400, 50, BLACK);
+        EndDrawing();
+    }
+}
+
 int main()
 {
     player bomberman;
@@ -279,17 +340,20 @@ int main()
     }
 
     InitWindow(WIDTH*METERS, HEIGHT*METERS, "Felix Bomberman");
-    for(int arrow = 2; !WindowShouldClose();/* espaço reservado para um possivel background animado*/)
+    SetTargetFPS(60);
+    for(coordinates arrow = {0, 0, 0}; !WindowShouldClose();/* espaço reservado para um possivel background animado*/)
     {
-        if(IsKeyPressed(KEY_UP)) arrow = (arrow+1)%3;
-        if(IsKeyPressed(KEY_DOWN)) arrow = (arrow+2)%3;
+        if(IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) arrow.y = (arrow.y+2)%3;
+        if(IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) arrow.y = (arrow.y+1)%3;
+        if(IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) arrow.x = (arrow.x+1)%2;
+        if(IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) arrow.x = (arrow.x+1)%2;
         if(IsKeyPressed(KEY_ENTER))
         {
-            if(arrow == 2)
+            if(arrow.y == 0 && arrow.x == 0)
             {
                 if(new_game(&bomberman, world, information)) break;
             }
-            if(arrow == 1)
+            if(arrow.y == 1 && arrow.x == 0)
             {
                 if(load_game(&bomberman, world, information)) break;
                 else
@@ -299,7 +363,10 @@ int main()
                     EndDrawing();*/
                 }
             }
-            if(arrow == 0)
+            if(arrow.y == 2 && arrow.x == 0) records();
+            if(arrow.y == 0 && arrow.x == 1) controls();
+            if(arrow.y == 1 && arrow.x == 1) show_devs();
+            if(arrow.y == 2 && arrow.x == 1)
             {
                 CloseWindow();
                 return 0;
@@ -309,10 +376,13 @@ int main()
         BeginDrawing();
             ClearBackground(RAYWHITE);
             DrawText("BOMBERMAN FELIX", 130, 100, 100, RED);
-            DrawText("Novo jogo", 130, 200, 70, BLACK);
-            DrawText("Carregar jogo", 130, 300, 70, BLACK);
-            DrawText("Sair", 130, 400, 70, BLACK);
-            DrawRectangle(70, (-100*arrow) + 400, 50, 50, RED);
+            DrawText("Novo jogo", 130, 250, 70, BLACK);
+            DrawText("Jogo salvo", 130, 350, 70, BLACK);
+            DrawText("Records", 130, 450, 70, BLACK);
+            DrawText("Controles", 630, 250, 70, BLACK);
+            DrawText("Criadores", 630, 350, 70, BLACK);
+            DrawText("Sair", 630, 450, 70, BLACK);
+            DrawRectangle(70 + (500*arrow.x), (100*arrow.y) + 250, 50, 50, RED);
         EndDrawing();
     }
 
@@ -386,7 +456,6 @@ int main()
 
     //posição inicial
     Vector2 origin = {0.0, 0.0};
-    SetTargetFPS(60);
     while(!WindowShouldClose())
     {
         if(IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) walk_right(&bomberman.local, world);
