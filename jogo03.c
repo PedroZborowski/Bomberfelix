@@ -28,6 +28,10 @@ Thiago Barbosa da Silva - 124247625*/
 #define DOWN 2
 #define LEFT 3
 
+//aqui são os defines do inimigo, vou comentar tudo e que se dane, eu fico perdidinho mane
+#define VEL_ENEMY 1
+#define MAX_ENEMYS 50
+
 typedef struct
 {
     int x;
@@ -46,6 +50,7 @@ typedef struct
 typedef struct
 {
     coordinates local;
+    double vel;
 } enemy;
 
 void walk_up(coordinates *local, char **world)
@@ -93,7 +98,7 @@ void put_bomb(player *bomberman, char *information/*, char **world*/)
     }
 }
 
-bool new_game(player *bomberman, char **world, char *information)
+bool new_game(player *bomberman, char **world, char *information, enemy estudante_de_letras[], int *num_enemys_on)
 {
     FILE *file = fopen("world.txt", "r");
     if(!file)
@@ -102,11 +107,13 @@ bool new_game(player *bomberman, char **world, char *information)
         return false;
     }
 
+    *num_enemys_on = 0;
+
     bomberman->lifes = '3';
     bomberman->bombs = '3';
     bomberman->points = 0;
     bomberman->local.direction = DOWN;
-    coordinates squares = {0, 0, 0};
+    coordinates squares = {0, 0, 0}; //leitor do arquivo, vai assim: W | E  W
     char object = fgetc(file);
     while(!feof(file))
     {
@@ -120,6 +127,22 @@ bool new_game(player *bomberman, char **world, char *information)
             bomberman->local.x = squares.x;
             bomberman->local.y = squares.y;
             *(*(world + squares.y) + squares.x) = FREE;
+            break;
+
+
+            case ENEMY:
+
+                enemy *inimigo_atual = &estudante_de_letras[*num_enemys_on];
+                inimigo_atual->local.x = squares.x;
+                inimigo_atual->local.y = squares.y;
+                    
+                // iniciando o timer de cada inimigo. EXTREMAMENTE IMPORTANTE, MEXA COM CUIDADO AQ
+                inimigo_atual->vel = 0.0; 
+
+                *(*(world + squares.y) + squares.x) = FREE;
+                    
+                (*num_enemys_on)++;
+            
             break;
 
             default:
@@ -206,13 +229,13 @@ bool save_game(player bomberman, char **world)
     return true;
 }
 
-void pause_game(player *bomberman, char *information, char **world)
+void pause_game(player *bomberman, char *information, char **world, enemy estudante_de_letras[], int *num_enemys_on)
 {
     while(!IsKeyPressed(KEY_V))
     {
         if(IsKeyPressed(KEY_N))
         {
-            if(new_game(bomberman, world, information)) break;
+            if(new_game(bomberman, world, information, estudante_de_letras, num_enemys_on)) break;
         }
         if(IsKeyPressed(KEY_C))
         {
@@ -226,7 +249,7 @@ void pause_game(player *bomberman, char *information, char **world)
     }
 }
 
-void lose_life(player *bomberman ,char *information, char **world)
+void lose_life(player *bomberman ,char *information, char **world, enemy estudante_de_letras[], int *num_enemys_on)
 {
     bomberman->lifes -= 1;
     *(information + 21) = bomberman->lifes;
@@ -237,7 +260,7 @@ void lose_life(player *bomberman ,char *information, char **world)
             if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
             if(IsKeyPressed(KEY_N))
             {
-                if(new_game(bomberman, world, information)) break;
+                if(new_game(bomberman, world, information, estudante_de_letras, num_enemys_on)) break;
             }
             if(IsKeyPressed(KEY_C))
             {
@@ -313,9 +336,42 @@ void controls()
     }
 }
 
+void enemy_move(enemy estudante_de_letras[], char **world)
+{
+    //to usando o vel como timer, para aumentar ou diminuir a velocidade dele é aqui
+    if (GetTime() - estudante_de_letras->vel >= 1.0) // A cada 1 segundo
+    {
+        // gero uma direção aleatória
+        int direcaoSorteada = GetRandomValue(0, 3); // to seguindo a mesma lógica dos defines do Henzel, 0 = UP, 1 = RIGHT, 2 = DOWN, 3 = LEFT
+
+        //Henzel amassou com essas funções aqui ta
+        switch (direcaoSorteada)
+        {
+            case UP:
+                walk_up(&estudante_de_letras->local, world);
+                break;
+            case RIGHT:
+                walk_right(&estudante_de_letras->local, world);
+                break;
+            case DOWN:
+                walk_down(&estudante_de_letras->local, world);
+                break;
+            case LEFT:
+                walk_left(&estudante_de_letras->local, world);
+                break;
+        }
+
+        //Necessário para, quando atualizar o loop lá no main, o tempo reiniciar ao iniciar aqui no if, por isso tem aquela linha de GetTime() - inimigo->vel...
+        estudante_de_letras->vel = GetTime();
+    }
+}
+
 int main()
 {
     player bomberman;
+    enemy estudante_de_letras[MAX_ENEMYS];
+    int num_enemys_on = 0;
+
     char *information = (char *)malloc(50*sizeof(char));
     if(!information)
     {
@@ -339,6 +395,8 @@ int main()
         }
     }
 
+
+
     InitWindow(WIDTH*METERS, HEIGHT*METERS, "Felix Bomberman");
     SetTargetFPS(60);
     for(coordinates arrow = {0, 0, 0}; !WindowShouldClose();/* espaço reservado para um possivel background animado*/)
@@ -351,7 +409,7 @@ int main()
         {
             if(arrow.y == 0 && arrow.x == 0)
             {
-                if(new_game(&bomberman, world, information)) break;
+                if(new_game(&bomberman, world, information, estudante_de_letras, &num_enemys_on)) break;
             }
             if(arrow.y == 1 && arrow.x == 0)
             {
@@ -463,8 +521,15 @@ int main()
         if(IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) walk_up(&bomberman.local, world);
         if(IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) walk_down(&bomberman.local, world);
         if(IsKeyPressed(KEY_B)) put_bomb(&bomberman, information/*, world*/);
-        if(IsKeyPressed(KEY_K)) lose_life(&bomberman , information, world);
-        if(IsKeyPressed(KEY_TAB)) pause_game(&bomberman, information, world);
+        if(IsKeyPressed(KEY_K)) lose_life(&bomberman , information, world, estudante_de_letras, &num_enemys_on);
+        if(IsKeyPressed(KEY_TAB)) pause_game(&bomberman, information, world, estudante_de_letras, &num_enemys_on);
+
+
+        for (int i = 0; i < num_enemys_on; i++)
+        {
+            enemy_move(&estudante_de_letras[i], world);
+        }    
+
 
         BeginDrawing();
             ClearBackground(RAYWHITE);
@@ -495,6 +560,10 @@ int main()
                         DrawTexture(box_spr, x*METERS, y*METERS, WHITE);
                         break;
 
+                        case ENEMY:
+                        DrawTexture(player_up_spr, x*METERS, y*METERS, RED);
+                        break;
+
                         case 5:
                         DrawTexture(key_spr, x*METERS, y*METERS, WHITE);
                     }
@@ -517,6 +586,11 @@ int main()
                 case LEFT:
                 DrawTexture(player_left_spr, bomberman.local.x*METERS, bomberman.local.y*METERS, WHITE);
             }
+            for (int i = 0; i < num_enemys_on; i++)
+            {
+                DrawTexture(player_down_spr, estudante_de_letras[i].local.x * METERS, estudante_de_letras[i].local.y * METERS, RED);
+            }
+
 
             DrawText(information, 20, 520, 60, GREEN);
         EndDrawing();
