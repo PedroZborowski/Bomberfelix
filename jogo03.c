@@ -342,10 +342,10 @@ void enemy_move(enemy estudante_de_letras[], char **world)
     if (GetTime() - estudante_de_letras->vel >= 1.0) // A cada 1 segundo
     {
         // gero uma direção aleatória
-        int direcaoSorteada = GetRandomValue(0, 3); // to seguindo a mesma lógica dos defines do Henzel, 0 = UP, 1 = RIGHT, 2 = DOWN, 3 = LEFT
+        int direction_random = GetRandomValue(0, 3); // to seguindo a mesma lógica dos defines do Henzel, 0 = UP, 1 = RIGHT, 2 = DOWN, 3 = LEFT
 
         //Henzel amassou com essas funções aqui ta
-        switch (direcaoSorteada)
+        switch (direction_random)
         {
             case UP:
                 walk_up(&estudante_de_letras->local, world);
