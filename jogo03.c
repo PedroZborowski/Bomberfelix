@@ -17,11 +17,13 @@ Thiago Barbosa da Silva - 124247625*/
 
 #define PLAYER 'J'
 #define FREE ' '
-#define WALL 'W'
-#define EXPLOSIBLE 'D'
+#define BLOCK 'W'
+#define WALL 'D'
 #define KEY_BOX 'B'
 #define EMPTY_BOX 'K'
 #define ENEMY 'E'
+#define KEY 'F'
+#define BOMB 'O'
 #define EXPLODING_WALL 'X'//To tendo que adionar isso aq pq lá em baixo eu preciso checar se a parede foi destruida sem transformar em "vazio" para poder limitar até onde desenhar a merda do sprite da explosão
 
 #define UP 0
@@ -60,6 +62,7 @@ typedef struct
     double walkTimer;
     bool ta_vivo;
 } enemy;
+
 typedef struct 
 {
     coordinates local;
@@ -68,21 +71,13 @@ typedef struct
     double explosion_timer;//para animação
     int explosion_frame;//para animação
     bool Exploding; //para animação
-}bomb;
+} bomb;
 
-
-////////////////////////////////////////////////////////////////////////////
-//Decidi fazer o protótipo de todas as funções aqui, quando eu tento usar a
-//função put_bomb fala que n conhece a outra função e etc, então duvido essa porra não conhecer agora
-////////////////////////////////////////////////////////////////////////////
-void put_bomb(player *bomberman, char **world, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on);
-void Explosion_impact(int x, int y, player *bomberman, char *information, char **world, enemy in_life_enemys[MAX_ENEMYS], int *num_on_enemys, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on);
-bool new_game(player *bomberman, char **world, char *information, enemy letter_student[MAX_ENEMYS], int *num_enemys_on, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on);
-bool load_game(player *bomberman, char **world, char *information, enemy letter_student[MAX_ENEMYS], int *num_enemys_on, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on);
-bool save_game(player bomberman, char **world, enemy letter_student[MAX_ENEMYS], int num_enemys_on, bomb activate_bombs[MAX_BOMBS], int num_bombs_on); 
-void pause_game(player *bomberman, char *information, char **world, enemy letter_student[MAX_ENEMYS], int *num_enemys_on, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on);
-void lose_life(player *bomberman ,char *information, char **world, enemy letter_student[MAX_ENEMYS], int *num_enemys_on, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on);
-////////////////////////////////////////////////////////////////////////////
+typedef struct
+{
+    char name[11];
+    int points;
+} record;
 
 bool walk_up(coordinates *local, char **world)
 {
@@ -103,7 +98,7 @@ bool walk_up(coordinates *local, char **world)
     }
 
     //Se ele estiver à direita do meio
-    else if(local->offsetX > 0){
+    if(local->offsetX > 0){
         if(*(*(world + local->y - 1) + local->x) == FREE  && *(*(world + local->y - 1) + local->x + 1) == FREE || local->offsetY != 0)
         {
             if(local->offsetY != -10) local->offsetY -= 1;
@@ -117,18 +112,16 @@ bool walk_up(coordinates *local, char **world)
     }
 
     //Se ele estiver exatamente no meio:
-    else{
-        if(*(*(world + local->y - 1) + local->x) == FREE || local->offsetY != 0)
-        {
-            if(local->offsetY != -10) local->offsetY -= 1;
-            else{
-                local->offsetY = 9;
-                local->y -= 1;
-            }
-            return true;
+    if(*(*(world + local->y - 1) + local->x) == FREE || local->offsetY != 0)
+    {
+        if(local->offsetY != -10) local->offsetY -= 1;
+        else{
+            local->offsetY = 9;
+            local->y -= 1;
         }
-        return false;
+        return true;
     }
+    return false;
 }
 
 bool walk_right(coordinates *local, char **world)
@@ -150,7 +143,7 @@ bool walk_right(coordinates *local, char **world)
     }
 
     //Se ele estiver abaixo do meio
-    else if(local->offsetY > 0){
+    if(local->offsetY > 0){
         if(*(*(world + local->y) + local->x + 1) == FREE  && *(*(world + local->y + 1) + local->x + 1) == FREE || local->offsetX != 0)
         {
             if(local->offsetX != 10) local->offsetX += 1;
@@ -164,18 +157,16 @@ bool walk_right(coordinates *local, char **world)
     }
 
     //Se ele estiver exatamente no meio:
-    else{
-        if(*(*(world + local->y) + local->x + 1) == FREE || local->offsetX != 0)
-        {
-            if(local->offsetX != 10) local->offsetX += 1;
-            else{
-                local->offsetX = -9;
-                local->x += 1;
-            }
-            return true;
+    if(*(*(world + local->y) + local->x + 1) == FREE || local->offsetX != 0)
+    {
+        if(local->offsetX != 10) local->offsetX += 1;
+        else{
+            local->offsetX = -9;
+            local->x += 1;
         }
-        return false;
+        return true;
     }
+    return false;
 }
 
 bool walk_down(coordinates *local, char **world)
@@ -197,7 +188,7 @@ bool walk_down(coordinates *local, char **world)
     }
 
     //Se ele estiver à direita do meio
-    else if(local->offsetX > 0){
+    if(local->offsetX > 0){
         if(*(*(world + local->y + 1) + local->x) == FREE  && *(*(world + local->y + 1) + local->x + 1) == FREE || local->offsetY != 0)
         {
             if(local->offsetY != 10) local->offsetY += 1;
@@ -211,18 +202,16 @@ bool walk_down(coordinates *local, char **world)
     }
 
     //Se ele estiver exatamente no meio:
-    else{
-       if(*(*(world + local->y + 1) + local->x) == FREE || local->offsetY != 0)
-        {
-            if(local->offsetY != 10) local->offsetY += 1;
-            else{
-                local->offsetY = -9;
-                local->y += 1;
-            }
-            return true;
+    if(*(*(world + local->y + 1) + local->x) == FREE || local->offsetY != 0)
+    {
+        if(local->offsetY != 10) local->offsetY += 1;
+        else{
+            local->offsetY = -9;
+            local->y += 1;
         }
-        return false;
+        return true;
     }
+    return false;
 }
 
 bool walk_left(coordinates *local, char **world)
@@ -244,7 +233,7 @@ bool walk_left(coordinates *local, char **world)
     }
 
     //Se ele estiver abaixo do meio
-    else if(local->offsetY > 0){
+    if(local->offsetY > 0){
         if(*(*(world + local->y) + local->x - 1) == FREE  && *(*(world + local->y + 1) + local->x - 1) == FREE || local->offsetX != 0)
         {
             if(local->offsetX != -10) local->offsetX -= 1;
@@ -258,18 +247,16 @@ bool walk_left(coordinates *local, char **world)
     }
 
     //Se ele estiver exatamente no meio:
-    else{
-        if(*(*(world + local->y) + local->x - 1) == FREE || local->offsetX != 0)
-        {
-            if(local->offsetX != -10) local->offsetX -= 1;
-            else{
-                local->offsetX = 9;
-                local->x -= 1;
-            }
-            return true;
+    if(*(*(world + local->y) + local->x - 1) == FREE || local->offsetX != 0)
+    {
+        if(local->offsetX != -10) local->offsetX -= 1;
+        else{
+            local->offsetX = 9;
+            local->x -= 1;
         }
-        return false;
+        return true;
     }
+    return false;
 }
 
 bool new_game(player *bomberman, char **world, char *information, enemy letter_student[MAX_ENEMYS], int *num_enemys_on, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on)
@@ -291,7 +278,9 @@ bool new_game(player *bomberman, char **world, char *information, enemy letter_s
     bomberman->lifes = '3';
     bomberman->points = 0;
     bomberman->local.direction = DOWN;
-    coordinates squares = {0, 0, 0}; //leitor do arquivo, vai assim: W | E  W
+    bomberman->local.offsetX = 0;
+    bomberman->local.offsetY = 0;
+    coordinates squares = {0, 0, 0, 0, 0}; //leitor do arquivo, vai assim: W | E  W
     char object = fgetc(file);
     while(!feof(file))
     {
@@ -304,8 +293,6 @@ bool new_game(player *bomberman, char **world, char *information, enemy letter_s
             case PLAYER:
             bomberman->local.x = squares.x;
             bomberman->local.y = squares.y;
-            bomberman->local.offsetX = 0;
-            bomberman->local.offsetY = 0;
             *(*(world + squares.y) + squares.x) = FREE;
             break;
 
@@ -340,13 +327,12 @@ bool new_game(player *bomberman, char **world, char *information, enemy letter_s
         }
         object = fgetc(file);
     }
-    *(information + 8) = MAX_BOMBS - *num_bombs_on;
+    *(information + 8) = '3';
     *(information + 21) = bomberman->lifes;
     *(information + 35) = '0';
     fclose(file);
     return true;
 }
-
 
 bool load_game(player *bomberman, char **world, char *information, enemy letter_student[MAX_ENEMYS], int *num_enemys_on, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on){
     FILE *file = fopen("save.dat", "rb");
@@ -360,7 +346,7 @@ bool load_game(player *bomberman, char **world, char *information, enemy letter_
         puts("Jogo carregado com sucesso");
     }
 
-    coordinates squares = {0, 0, 0};
+    coordinates squares = {0, 0, 0, 0, 0};
     char object;
     fread(&object, sizeof(char), 1, file);
     while(object != '\n')
@@ -412,68 +398,61 @@ bool save_game(player bomberman, char **world, enemy letter_student[MAX_ENEMYS],
     return true;
 }
 
-void pause_game(player *bomberman, char *information, char **world, enemy letter_student[MAX_ENEMYS], int *num_enemys_on, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on)
+void saveRecord(player bomberman)
 {
-    while(!IsKeyPressed(KEY_V))
+    record saving;
+    saving.points = bomberman.points;
+    FILE *file = fopen("record.dat", "rb+");
+    if(!file)
     {
-        if(IsKeyPressed(KEY_N))
+        puts("O arquivo nao existia ainda mas agora foi criado");
+        file = fopen("record.dat", "wb");
+        if(!file)
         {
-            if(new_game(bomberman, world, information, letter_student, num_enemys_on, activate_bombs, num_bombs_on)) break;
+            puts("ERRO - O record nao pode ser salvo");
         }
-        if(IsKeyPressed(KEY_C))
+        puts("Digite seu nome: ");
+        scanf("%s", saving.name);
+        fgetc(stdin);
+        fwrite(&saving, sizeof(record), 1, file);
+        strcpy(saving.name, "----------");
+        saving.points = 0;
+        for(int i = 0; i < 9; i++)
         {
-            if(load_game(bomberman, world, information, letter_student, num_enemys_on, activate_bombs, num_bombs_on)) break;
+            fwrite(&saving, sizeof(record), 1, file);
         }
-        if(IsKeyPressed(KEY_S)) save_game(*bomberman, world, letter_student, *num_enemys_on, activate_bombs, *num_bombs_on);
-        if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
-        BeginDrawing();
-            DrawText("PAUSE", 130, 220, 150, RED);
-        EndDrawing();
+        puts("Record salvo com sucesso");
     }
-}
-
-void lose_life(player *bomberman ,char *information, char **world, enemy letter_student[MAX_ENEMYS], int *num_enemys_on, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on)
-{
-    bomberman->lifes -= 1;
-    *(information + 21) = bomberman->lifes;
-    if(bomberman->lifes <= '0')
+    else
     {
-        while(!IsKeyPressed(KEY_J))//tecla temporaria
+        puts("Arquivo ja existe, verificando onde a pontuacao ficara");
+        record records[10];
+        int check = 10;
+        for(int i = 0; i < 10; i++)
         {
-            if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
-            if(IsKeyPressed(KEY_N))
+            fread(records+i, sizeof(record), 1, file);
+            if(check == 10) if((records+i)->points < saving.points) check = i;
+        }
+        fseek(file, check*sizeof(record), SEEK_SET);
+        if(check != 10)
+        {
+            printf("Pontuacao na posicao %d\n", check+1);
+            puts("Digite seu nome: ");
+            scanf("%s", saving.name);
+            fgetc(stdin);
+            fwrite(&saving, sizeof(record), 1, file);
+            for(int j = check; j < 9; j++)
             {
-                if (new_game(bomberman, world, information, letter_student, num_enemys_on, activate_bombs, num_bombs_on)) break;
+                fwrite(records+j, sizeof(record), 1, file);
             }
-            if(IsKeyPressed(KEY_C))
-            {
-                if(load_game(bomberman, world, information, letter_student, num_enemys_on, activate_bombs, num_bombs_on)) break;
-            }
-            DrawRectangle(620, 520, 60, 60, RAYWHITE);
-            DrawText("0", 640, 520, 60, GREEN);
-            BeginDrawing();
-            DrawText("GAME OVER", 130, 220, 150, RED);
-            EndDrawing();
+            puts("Record salvo com sucesso");
+        }
+        else
+        {
+            puts("Nao obteve uma pontuacao suficiente para ser salva");
         }
     }
-}
-
-void show_devs()
-{
-    while(!IsKeyPressed(KEY_V))
-    {
-        if(WindowShouldClose()) CloseWindow();
-        BeginDrawing();
-            ClearBackground(RAYWHITE);
-            DrawText("DESENVOLVEDORES", 250, 0, 50, RED);
-            DrawText("Gabriel Felix Hilleshein - 124047790", 65, 100, 40, RED);
-            DrawText("Gabriel Henzel Diniz Costa - 124171450", 65, 170, 40, RED);
-            DrawText("Laísa Tatiana Oliveira de Medeiros - 124225429", 65, 240, 40, RED);
-            DrawText("Luiz Vitor Vieira de Mattos- 124280314", 65, 310, 40, RED);
-            DrawText("Pedro de Oliveira Bokel Zborowski - 124176573", 65, 380, 40, RED);
-            DrawText("Thiago Barbosa da Silva - 124247625", 65, 450, 40, RED);
-        EndDrawing();
-    }
+    fclose(file);
 }
 
 void records()
@@ -519,7 +498,72 @@ void controls()
     }
 }
 
+void pause_game(player *bomberman, char *information, char **world, enemy letter_student[MAX_ENEMYS], int *num_enemys_on, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on)
+{
+    while(!IsKeyPressed(KEY_V))
+    {
+        if(IsKeyPressed(KEY_N))
+        {
+            if(new_game(bomberman, world, information, letter_student, num_enemys_on, activate_bombs, num_bombs_on)) break;
+        }
+        if(IsKeyPressed(KEY_C))
+        {
+            if(load_game(bomberman, world, information, letter_student, num_enemys_on, activate_bombs, num_bombs_on)) break;
+        }
+        if(IsKeyPressed(KEY_S)) save_game(*bomberman, world, letter_student, *num_enemys_on, activate_bombs, *num_bombs_on);
+        if(IsKeyPressed(KEY_R)) records();
+        if(IsKeyPressed(KEY_K)) controls();
+        if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
+        BeginDrawing();
+            DrawText("PAUSE", 130, 220, 150, RED);
+        EndDrawing();
+    }
+}
 
+void lose_life(player *bomberman, char *information, char **world, enemy letter_student[MAX_ENEMYS], int *num_enemys_on, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on)
+{
+    bomberman->lifes -= 1;
+    *(information + 21) -= 1;
+    if(bomberman->lifes <= '0')
+    {
+        saveRecord(*bomberman);
+        while(!IsKeyPressed(KEY_J))//tecla temporaria
+        {
+            if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
+            if(IsKeyPressed(KEY_N))
+            {
+                if (new_game(bomberman, world, information, letter_student, num_enemys_on, activate_bombs, num_bombs_on)) break;
+            }
+            if(IsKeyPressed(KEY_C))
+            {
+                if(load_game(bomberman, world, information, letter_student, num_enemys_on, activate_bombs, num_bombs_on)) break;
+            }
+            DrawRectangle(620, 520, 60, 60, RAYWHITE);
+            DrawText("0", 640, 520, 60, GREEN);
+            BeginDrawing();
+            DrawText("GAME OVER", 130, 220, 150, RED);
+            EndDrawing();
+        }
+    }
+}
+
+void show_devs()
+{
+    while(!IsKeyPressed(KEY_V))
+    {
+        if(WindowShouldClose()) CloseWindow();
+        BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawText("DESENVOLVEDORES", 250, 0, 50, RED);
+            DrawText("Gabriel Felix Hilleshein - 124047790", 65, 100, 40, RED);
+            DrawText("Gabriel Henzel Diniz Costa - 124171450", 65, 170, 40, RED);
+            DrawText("Laísa Tatiana Oliveira de Medeiros - 124225429", 65, 240, 40, RED);
+            DrawText("Luiz Vitor Vieira de Mattos- 124280314", 65, 310, 40, RED);
+            DrawText("Pedro de Oliveira Bokel Zborowski - 124176573", 65, 380, 40, RED);
+            DrawText("Thiago Barbosa da Silva - 124247625", 65, 450, 40, RED);
+        EndDrawing();
+    }
+}
 
 void put_bomb(player *bomberman, char **world, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on)
 {
@@ -531,31 +575,26 @@ void put_bomb(player *bomberman, char **world, bomb activate_bombs[MAX_BOMBS], i
         switch (bomberman->local.direction){
             case UP: bombY--;
             break;
-
             case DOWN: bombY++;
             break;
             case LEFT: bombX--;
             break;
             case RIGHT: bombX++;
-            break;
         }
-        if(bombX >= 0 && bombX < WIDTH &&bombY >=0 && bombY < STATURE){
-            if(*(*(world + bombY) + bombX) == FREE){
-                *(*(world + bombY) + bombX) = 'O'; //aritmética de ponteiros, estou acessando a linha *(world + bombY) e logo em seguida indo para a coluna certa *(world + bombY) + bombX depois disso eu só desreferebcui
+        if(*(*(world + bombY) + bombX) == FREE){
+            *(*(world + bombY) + bombX) = BOMB; //aritmética de ponteiros, estou acessando a linha *(world + bombY) e logo em seguida indo para a coluna certa *(world + bombY) + bombX depois disso eu só desreferebcui
 
-                activate_bombs[*num_bombs_on].local.x = bombX;
-                activate_bombs[*num_bombs_on].local.y = bombY;
-                activate_bombs[*num_bombs_on].planttime = GetTime();
-                activate_bombs[*num_bombs_on].active_or_not = true;
-                activate_bombs[*num_bombs_on].Exploding = false;//para animação
-                activate_bombs[*num_bombs_on].explosion_frame = 0; //para animação
-                activate_bombs[*num_bombs_on].explosion_timer = 0.0; //para animação
-                (*num_bombs_on)++;
-            }
+            activate_bombs[*num_bombs_on].local.x = bombX;
+            activate_bombs[*num_bombs_on].local.y = bombY;
+            activate_bombs[*num_bombs_on].planttime = GetTime();
+            activate_bombs[*num_bombs_on].active_or_not = true;
+            activate_bombs[*num_bombs_on].Exploding = false;//para animação
+            activate_bombs[*num_bombs_on].explosion_frame = 0; //para animação
+            activate_bombs[*num_bombs_on].explosion_timer = 0.0; //para animação
+            (*num_bombs_on)++;
         }
     }
 }
-
 
 void Explosion_impact(int x, int y, player *bomberman, char *information, char **world, enemy in_life_enemys[MAX_ENEMYS], int *num_on_enemys, bomb activate_bombs[MAX_BOMBS], int *num_bombs_on){
     if(bomberman->local.x == x && bomberman->local.y == y){
@@ -576,7 +615,7 @@ void Explosion_impact(int x, int y, player *bomberman, char *information, char *
     }
 
     char cell = *(*(world + y) + x);
-    if(cell == EXPLOSIBLE){
+    if(cell == WALL){
         *(*(world + y) + x) = EXPLODING_WALL;
         bomberman->points += 10;
     }else if(cell ==EMPTY_BOX){
@@ -650,11 +689,9 @@ int main()
         }
     }
 
-
-
     InitWindow(WIDTH*METERS, HEIGHT*METERS, "BomberFelix");
     SetTargetFPS(60);
-    for(coordinates arrow = {0, 0, 0}; !WindowShouldClose();/* espaço reservado para um possivel background animado*/)
+    for(coordinates arrow = {0, 0, 0, 0, 0}; !WindowShouldClose();/* espaço reservado para um possivel background animado*/)
     {
         if(IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) arrow.y = (arrow.y+2)%3;
         if(IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) arrow.y = (arrow.y+1)%3;
@@ -801,6 +838,7 @@ int main()
             }
         }
         if(IsKeyPressed(KEY_B)) put_bomb(&bomberman, world, activate_bombs, &num_bombs_on);
+        if(IsKeyPressed(KEY_P)) {bomberman.points += 100; printf("Pontos: %d\n", bomberman.points);}//trapaça pra testar record
         if(IsKeyPressed(KEY_K)) lose_life(&bomberman , information, world, letter_student, &num_enemys_on, activate_bombs, &num_bombs_on);
         if(IsKeyPressed(KEY_TAB)) pause_game(&bomberman, information, world, letter_student, &num_enemys_on, activate_bombs, &num_bombs_on);
 
@@ -844,7 +882,7 @@ int main()
                         //direção para cima 
                         ///////////////////////////////////////////////////////////////
                         if(!parou_cima && bombY - j >= 0){
-                            if(*(*(world + bombY - j) + bombX) == WALL){
+                            if(*(*(world + bombY - j) + bombX) == BLOCK){
                                 parou_cima = true;
                             }else{
                             //se o bloco q sofreu impacto não é vazio...
@@ -856,7 +894,7 @@ int main()
                         //Direção para baixo
                         ///////////////////////////////////////////////////////////////
                         if(!parou_baixo && bombY + j < STATURE){
-                            if(*(*(world + bombY + j) + bombX) == WALL){
+                            if(*(*(world + bombY + j) + bombX) == BLOCK){
                                 parou_baixo = true;
                             }else{
                             //se o bloco q sofreu impacto não é vazio...
@@ -868,7 +906,7 @@ int main()
                         //Direção para a esquerda
                         ///////////////////////////////////////////////////////////////
                         if(!parou_esquerda && bombX - j >=0){
-                            if(*(*(world + bombY) + bombX - j) == WALL){
+                            if(*(*(world + bombY) + bombX - j) == BLOCK){
                                 parou_esquerda = true;
                             }else{
                             //se o bloco q sofreu impacto não é vazio...
@@ -880,7 +918,7 @@ int main()
                         //Direção para a direita
                         ///////////////////////////////////////////////////////////////
                         if(!parou_direita && bombX + j < WIDTH){
-                            if(*(*(world + bombY) + bombX + j) == WALL){
+                            if(*(*(world + bombY) + bombX + j) == BLOCK){
                                 parou_direita = true;
                             }else{
                             //se o bloco q sofreu impacto não é vazio...
@@ -930,11 +968,11 @@ int main()
                 {
                     switch(*(*(world + y) + x))
                     {
-                        case WALL:
+                        case BLOCK:
                         DrawTexture(wall_spr, x*METERS, y*METERS, WHITE);
                         break;
 
-                        case EXPLOSIBLE:
+                        case WALL:
                         DrawTexture(explosible_spr, x*METERS, y*METERS, WHITE);
                         break;
 
@@ -946,7 +984,7 @@ int main()
                         DrawTexture(box_spr, x*METERS, y*METERS, WHITE);
                         break;
 
-                        case 'F':
+                        case KEY:
                         DrawTexture(key_spr, x*METERS, y*METERS, WHITE);
                         break;
                         
@@ -979,7 +1017,7 @@ int main()
                         //Para cima
                         //////////////////////////////////////////////////////////    
                             if (!para_cima_desenho && bombY - j >= 0) {
-                            if (*(*(world + bombY - j) + bombX) == WALL) {
+                            if (*(*(world + bombY - j) + bombX) == BLOCK) {
                                 para_cima_desenho = true;
                             } else {
                                 DrawTexture(explosion_spr[frame], bombX * METERS, (bombY - j) * METERS, WHITE);
@@ -991,7 +1029,7 @@ int main()
                         //Para baixo
                         //////////////////////////////////////////////////////////    
                             if (!para_baixo_desenho && bombY + j < STATURE) {
-                            if (*(*(world + bombY + j) + bombX) == WALL) {
+                            if (*(*(world + bombY + j) + bombX) == BLOCK) {
                                 para_baixo_desenho = true;
                             } else {
                                 DrawTexture(explosion_spr[frame], bombX * METERS, (bombY + j) * METERS, WHITE);
@@ -1003,7 +1041,7 @@ int main()
                         //Para esquerda
                         //////////////////////////////////////////////////////////    
                             if (!para_esquerda_desenho && bombX - j >= 0) {
-                            if (*(*(world + bombY) + bombX - j) == WALL) {
+                            if (*(*(world + bombY) + bombX - j) == BLOCK) {
                                 para_esquerda_desenho = true;
                             } else {
                                 DrawTexture(explosion_spr[frame], (bombX - j) * METERS, bombY * METERS, WHITE);
@@ -1015,7 +1053,7 @@ int main()
                         //Para direita
                         //////////////////////////////////////////////////////////    
                             if (!para_direita_desenho && bombX + j < WIDTH) {
-                            if (*(*(world + bombY) + bombX + j) == WALL) {
+                            if (*(*(world + bombY) + bombX + j) == BLOCK) {
                                 para_direita_desenho = true;
                             } else {
                                 DrawTexture(explosion_spr[frame], (bombX + j) * METERS, bombY * METERS, WHITE);
@@ -1068,8 +1106,8 @@ int main()
     UnloadTexture(box_spr);
     UnloadTexture(key_spr);
     UnloadTexture(floor_spr);
-    free(information);
     UnloadTexture(bomb_spr);
+    free(information);
     for (int i = 0; i < 3; i++) {
         UnloadTexture(explosion_spr[i]);
     }
