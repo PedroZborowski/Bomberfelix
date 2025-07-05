@@ -31,14 +31,30 @@ Thiago Barbosa da Silva - 124247625*/
 #define DOWN 2
 #define LEFT 3
 
-//aqui são os defines do inimigo, vou comentar tudo e que se dane, eu fico perdidinho mane
-#define VEL_ENEMY 1
-#define MAX_ENEMYS 5
-
 #define MAX_BOMBS 3
 #define TIMER_BOMB 3.0
+#define TIME_ANIMATION_BOMB 0.1
 
-#define TIME_ANIMATION_BOMB 0.1f
+/*typedef int TIPOCHAVE;
+
+typedef struct
+{
+    TIPOCHAVE chave;
+} REGISTRO;
+
+typedef struct aux
+{
+    REGISTRO reg;
+    struct aux* prox;
+} ELEMENTO;
+
+typedef ELEMENTO* PONT;
+
+typedef struct
+{
+    PONT inicio;
+    PONT fim;
+} FILA;*/
 
 typedef struct
 {
@@ -48,6 +64,25 @@ typedef struct
     int offsetY;
     int direction;
 } coordinates;
+
+typedef struct
+{
+    coordinates local;
+    double walkTimer;
+} enemy;
+
+typedef struct aux
+{
+    enemy zombie;
+    struct aux* next;
+} ELEMENT;
+
+typedef ELEMENT* POINTER;
+
+typedef struct
+{
+    POINTER start;
+} LIST;
 
 typedef struct 
 {
@@ -70,18 +105,75 @@ typedef struct
 
 typedef struct
 {
-    coordinates local;
-    double walkTimer;
-    bool ta_vivo;
-} enemy;
-
-typedef struct
-{
     char name[11];
     int points;
 } record;
 
-bool walk_up(coordinates *local, char **world)
+void bootList(LIST* horde)
+{
+    horde->start = NULL;
+}
+
+bool putList(LIST* horde, enemy zombie, int pos)//modificar para preencher onde estiver livre
+{
+    //if(pos < 0 || pos > tamanho(horde)) return false;
+    POINTER novo = (POINTER)malloc(sizeof(ELEMENT));
+    if(!novo)
+    {
+        puts("ERRO");
+        return false;
+    }
+    novo->zombie = zombie;
+    POINTER p;
+    if(pos == 0)
+    {
+        novo->next = horde->start;
+        horde->start = novo;
+    }
+    else
+    {
+        p = horde->start;
+        for(int i = 0; i < pos-1; i++) p = p->next;
+        novo->next = p->next;
+        p->next = novo;
+    }
+    return true;
+}
+
+bool takeList(LIST* horde, int pos)
+{
+    //if(pos < 0 || pos > tamanho(horde)-1) return false;
+    POINTER p;
+    POINTER apagar;
+    if(pos == 0)
+    {
+        apagar = horde->start;
+        horde->start = apagar->next;
+    }
+    else
+    {
+        p = horde->start;
+        for (int i = 0; i < pos-1; i++) p = p->next;
+        apagar = p->next;
+        p->next = apagar->next;
+    }
+    free(apagar);
+    return true;
+}
+
+void rebootList(LIST* horde)
+{
+    POINTER end = horde->start;
+    while(end != NULL)
+    {
+        POINTER apagar = end;
+        end = end->next;
+        free(apagar);
+    }
+    horde->start = NULL;
+}
+
+bool walkUp(coordinates *local, char **world)
 {
     local->direction = UP;
     if(local->offsetY != 0)
@@ -135,7 +227,7 @@ bool walk_up(coordinates *local, char **world)
     return false;
 }
 
-bool walk_right(coordinates *local, char **world)
+bool walkRight(coordinates *local, char **world)
 {
     local->direction = RIGHT;
     if(local->offsetX != 0)
@@ -189,7 +281,7 @@ bool walk_right(coordinates *local, char **world)
     return false;
 }
 
-bool walk_down(coordinates *local, char **world)
+bool walkDown(coordinates *local, char **world)
 {
     local->direction = DOWN;
     if(local->offsetY != 0)
@@ -243,7 +335,7 @@ bool walk_down(coordinates *local, char **world)
     return false;
 }
 
-bool walk_left(coordinates *local, char **world)
+bool walkLeft(coordinates *local, char **world)
 {
     local->direction = LEFT;
     if(local->offsetX != 0)
@@ -297,7 +389,7 @@ bool walk_left(coordinates *local, char **world)
     return false;
 }
 
-bool new_game(player *bomberman, char **world, char *information, enemy letter_student[MAX_ENEMYS], int *num_enemys_on)
+bool newGame(player *bomberman, char **world, char *information, LIST *horde)
 {
     FILE *file = fopen("world.txt", "r");
     if(!file)
@@ -305,8 +397,6 @@ bool new_game(player *bomberman, char **world, char *information, enemy letter_s
         puts("ERRO - O nivel nao pode ser aberto");
         return false;
     }
-
-    *num_enemys_on = 0;
 
     bomberman->lifes = '3';
     bomberman->points = 0;
@@ -321,6 +411,12 @@ bool new_game(player *bomberman, char **world, char *information, enemy letter_s
     squares.x = 0;
     squares.y = 0;
     char object = fgetc(file);
+    enemy inimigo_atual;
+    inimigo_atual.local.offsetX = 0;
+    inimigo_atual.local.offsetY = 0;
+    inimigo_atual.walkTimer = 0.0;
+    int number = 0;
+    rebootList(horde);
     while(!feof(file))
     {
         switch(object)
@@ -337,22 +433,12 @@ bool new_game(player *bomberman, char **world, char *information, enemy letter_s
 
 
             case ENEMY:
-
-                enemy *inimigo_atual = &letter_student[*num_enemys_on];
-                inimigo_atual->local.x = squares.x;
-                inimigo_atual->local.y = squares.y;
-                inimigo_atual->local.offsetX = 0;
-                inimigo_atual->local.offsetY = 0;
-                inimigo_atual->ta_vivo = true;
-                    
-                // iniciando o timer de cada inimigo. EXTREMAMENTE IMPORTANTE, MEXA COM CUIDADO AQ
-                letter_student->local.direction = GetRandomValue(0, 3);
-                inimigo_atual->walkTimer = 0.0; 
-
-                *(*(world + squares.y) + squares.x) = FREE;
-                    
-                (*num_enemys_on)++;
-            
+            inimigo_atual.local.x = squares.x;
+            inimigo_atual.local.y = squares.y;
+            inimigo_atual.local.direction = GetRandomValue(0, 3);
+            *(*(world + squares.y) + squares.x) = FREE;
+            putList(horde, inimigo_atual, number);
+            number++;
             break;
 
             default:
@@ -373,7 +459,7 @@ bool new_game(player *bomberman, char **world, char *information, enemy letter_s
     return true;
 }
 
-bool load_game(player *bomberman, char **world, char *information, enemy letter_student[MAX_ENEMYS], int *num_enemys_on)
+bool loadGame(player *bomberman, char **world, char *information, LIST *horde)
 {
     FILE *file = fopen("save.dat", "rb");
     if(!file)
@@ -404,6 +490,17 @@ bool load_game(player *bomberman, char **world, char *information, enemy letter_
     }
     fread(bomberman, sizeof(player), 1, file);
 
+    rebootList(horde);
+    enemy inimigo_atual;
+    fread(&inimigo_atual, sizeof(enemy), 1, file);
+    int number = 0;
+    while(!feof(file))
+    {
+        putList(horde, inimigo_atual, number);
+        fread(&inimigo_atual, sizeof(enemy), 1, file);
+        number++;
+    }
+
     char active_bombs = '0';
     for(int i = 0; i < MAX_BOMBS; i++)
     {
@@ -411,13 +508,13 @@ bool load_game(player *bomberman, char **world, char *information, enemy letter_
     }
     *(information + 8) = active_bombs;
     *(information + 21) = bomberman->lifes;
-    *(information + 35) = '0';
+    sprintf(information + 35, "%d", bomberman->points);
 
     fclose(file);
     return true;
 }
 
-bool save_game(player bomberman, char **world, enemy letter_student[MAX_ENEMYS], int num_enemys_on)
+bool saveGame(player bomberman, char **world, LIST *horde)
 {
     FILE *file = fopen("save.dat", "wb");
     if(!file)
@@ -440,6 +537,13 @@ bool save_game(player bomberman, char **world, enemy letter_student[MAX_ENEMYS],
     char split = '\n';
     fwrite(&split, sizeof(char), 1, file);
     fwrite(&bomberman, sizeof(player), 1, file);
+
+    POINTER end = horde->start;
+    while(end != NULL)
+    {
+        fwrite(&horde->start->zombie, sizeof(enemy), 1, file);
+        end = end->next;
+    }
 
     fclose(file);
     return true;
@@ -473,12 +577,12 @@ void saveRecord(player bomberman)
     else
     {
         puts("Arquivo ja existe, verificando onde a pontuacao ficara");
-        record records[10];
+        record reading[10];
         int check = 10;
         for(int i = 0; i < 10; i++)
         {
-            fread(records+i, sizeof(record), 1, file);
-            if(check == 10) if((records+i)->points < saving.points) check = i;
+            fread(reading+i, sizeof(record), 1, file);
+            if(check == 10) if((reading+i)->points < saving.points) check = i;
         }
         fseek(file, check*sizeof(record), SEEK_SET);
         if(check != 10)
@@ -490,7 +594,7 @@ void saveRecord(player bomberman)
             fwrite(&saving, sizeof(record), 1, file);
             for(int j = check; j < 9; j++)
             {
-                fwrite(records+j, sizeof(record), 1, file);
+                fwrite(reading+j, sizeof(record), 1, file);
             }
             puts("Record salvo com sucesso");
         }
@@ -502,7 +606,7 @@ void saveRecord(player bomberman)
     fclose(file);
 }
 
-void records()
+void showRecords()
 {
     FILE *file = fopen("record.dat", "rb");
     if(!file)
@@ -529,12 +633,12 @@ void records()
     }
     else
     {
-        record records[10];
+        record reading[10];
         char pontos[10][50];
         for(int i = 0; i < 10; i++)
         {
-            fread(records+i, sizeof(record), 1, file);
-            sprintf(pontos[i], "%d", records[i].points);
+            fread(reading+i, sizeof(record), 1, file);
+            sprintf(pontos[i], "%d", reading[i].points);
         }
         while(!IsKeyPressed(KEY_V)) //ta feio q doi isso aq mas depois eu arrumo
         {
@@ -544,34 +648,34 @@ void records()
                 DrawText("RECORDS", 50, 10, 50, RED);
                 DrawText("Nome do jogador | pontuação", 350, 15, 40, RED);
                 DrawText(" 1º             |", 50, 100, 50, BLACK);
-                DrawText(records[0].name , 110, 100, 50, BLACK);
+                DrawText(reading[0].name , 110, 100, 50, BLACK);
                 DrawText(pontos[0] , 380, 100, 50, BLACK);
                 DrawText(" 2º             |", 40, 200, 50, BLACK);
-                DrawText(records[1].name, 110, 200, 50, BLACK);
+                DrawText(reading[1].name, 110, 200, 50, BLACK);
                 DrawText(pontos[1], 380, 200, 50, BLACK);
                 DrawText(" 3º             |", 40, 300, 50, BLACK);
-                DrawText(records[2].name , 110, 300, 50, BLACK);
+                DrawText(reading[2].name , 110, 300, 50, BLACK);
                 DrawText(pontos[2] , 380, 300, 50, BLACK);
                 DrawText(" 4º             |", 40, 400, 50, BLACK);
-                DrawText(records[3].name , 110, 400, 50, BLACK);
+                DrawText(reading[3].name , 110, 400, 50, BLACK);
                 DrawText(pontos[3] , 380, 400, 50, BLACK);
                 DrawText(" 5º             |", 40, 500, 50, BLACK);
-                DrawText(records[4].name , 110, 500, 50, BLACK);
+                DrawText(reading[4].name , 110, 500, 50, BLACK);
                 DrawText(pontos[4] , 380, 500, 50, BLACK);
                 DrawText(" 6º             |", 600, 100, 50, BLACK);
-                DrawText(records[5].name , 670, 100, 50, BLACK);
+                DrawText(reading[5].name , 670, 100, 50, BLACK);
                 DrawText(pontos[5] , 940, 100, 50, BLACK);
                 DrawText(" 7º             |", 600, 200, 50, BLACK);
-                DrawText(records[6].name , 670, 200, 50, BLACK);
+                DrawText(reading[6].name , 670, 200, 50, BLACK);
                 DrawText(pontos[6] , 940, 200, 50, BLACK);
                 DrawText(" 8º             |", 600, 300, 50, BLACK);
-                DrawText(records[7].name , 670, 300, 50, BLACK);
+                DrawText(reading[7].name , 670, 300, 50, BLACK);
                 DrawText(pontos[7] , 940, 300, 50, BLACK);
                 DrawText(" 9º             |", 600, 400, 50, BLACK);
-                DrawText(records[8].name , 670, 400, 50, BLACK);
+                DrawText(reading[8].name , 670, 400, 50, BLACK);
                 DrawText(pontos[8] , 940, 400, 50, BLACK);
                 DrawText("10º             |", 600, 500, 50, BLACK);
-                DrawText(records[9].name , 670, 500, 50, BLACK);
+                DrawText(reading[9].name , 670, 500, 50, BLACK);
                 DrawText(pontos[9] , 940, 500, 50, BLACK);
             EndDrawing();
         }
@@ -579,7 +683,7 @@ void records()
     fclose(file);
 }
 
-void controls()
+void showControls()
 {
     while(!IsKeyPressed(KEY_V))
     {
@@ -599,29 +703,7 @@ void controls()
     }
 }
 
-void pause_game(player *bomberman, char *information, char **world, enemy letter_student[MAX_ENEMYS], int *num_enemys_on)
-{
-    while(!IsKeyPressed(KEY_V))
-    {
-        if(IsKeyPressed(KEY_N))
-        {
-            if(new_game(bomberman, world, information, letter_student, num_enemys_on)) break;
-        }
-        if(IsKeyPressed(KEY_C))
-        {
-            if(load_game(bomberman, world, information, letter_student, num_enemys_on)) break;
-        }
-        if(IsKeyPressed(KEY_S)) save_game(*bomberman, world, letter_student, *num_enemys_on);
-        if(IsKeyPressed(KEY_R)) records();
-        if(IsKeyPressed(KEY_K)) controls();
-        if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
-        BeginDrawing();
-            DrawText("PAUSE", 130, 220, 150, RED);
-        EndDrawing();
-    }
-}
-
-void lose_life(player *bomberman, char *information, char **world, enemy letter_student[MAX_ENEMYS], int *num_enemys_on)
+void loseLife(player *bomberman, char *information, char **world, LIST *horde)
 {
     if(bomberman->points >=100) bomberman->points -= 100;//falta mudar a informacao dos pontos
     else bomberman->points = 0;
@@ -635,11 +717,11 @@ void lose_life(player *bomberman, char *information, char **world, enemy letter_
             if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
             if(IsKeyPressed(KEY_N))
             {
-                if (new_game(bomberman, world, information, letter_student, num_enemys_on)) break;
+                if (newGame(bomberman, world, information, horde)) break;
             }
             if(IsKeyPressed(KEY_C))
             {
-                if(load_game(bomberman, world, information, letter_student, num_enemys_on)) break;
+                if(loadGame(bomberman, world, information, horde)) break;
             }
             DrawRectangle(620, 520, 60, 60, RAYWHITE);
             DrawText("0", 640, 520, 60, GREEN);
@@ -651,7 +733,7 @@ void lose_life(player *bomberman, char *information, char **world, enemy letter_
     }
 }
 
-void show_devs()
+void showDevs()
 {
     while(!IsKeyPressed(KEY_V))
     {
@@ -669,7 +751,7 @@ void show_devs()
     }
 }
 
-void put_bomb(player *bomberman, char **world, char *information)
+void putBomb(player *bomberman, char **world, char *information)
 {
     for(int i = 0; i < MAX_BOMBS; i++)
     {
@@ -709,17 +791,21 @@ void put_bomb(player *bomberman, char **world, char *information)
     }
 }
 
-void Explosion_impact(int x, int y, player *bomberman, char *information, char **world, enemy in_life_enemys[MAX_ENEMYS], int *num_on_enemys){
+void Explosion_impact(int x, int y, player *bomberman, char *information, char **world, LIST *horde){
     if(bomberman->local.x == x && bomberman->local.y == y){
-        lose_life(bomberman, information, world, in_life_enemys, num_on_enemys);
+        loseLife(bomberman, information, world, horde);
     }
     //bem simples também, apenas passo pelo número de inimigos ativo e desativo eles. Aproveito e aumento os points dele, para facilitar o trabalho do Henzel (minha vez de roubar trampo muahahahahhahah)
-    for(int i = 0; i < *num_on_enemys; i++){
-        if(in_life_enemys[i].ta_vivo &&in_life_enemys[i].local.x == x && in_life_enemys[i].local.y == y){
-            in_life_enemys[i].ta_vivo = false; // No céu tem pão? morri - Diddi
+    POINTER end = horde->start;
+    int number = 0;
+    while(end != NULL){
+        if(end->zombie.local.x == x && end->zombie.local.y == y){
+            takeList(horde, number);
             bomberman->points +=20;
             sprintf(information + 35 , "%d", bomberman->points);
         }
+        number++;
+        end = end->next;
     }
 
     char *cell = *(world + y) + x;
@@ -735,41 +821,123 @@ void Explosion_impact(int x, int y, player *bomberman, char *information, char *
     }
 }
 
-void enemy_move(enemy *letter_student, char **world)
+void enemyMove(enemy *zombie, char **world)
 {
-    if(!letter_student->ta_vivo) return;
     bool arrived = false;
     //Henzel amassou com essas funções aqui ta
-    switch (letter_student->local.direction)
+    switch(zombie->local.direction)
     {
         case UP:
-            arrived = !walk_up(&letter_student->local, world);
+            arrived = !walkUp(&zombie->local, world);
             break;
          case RIGHT:
-            arrived = !walk_right(&letter_student->local, world);
+            arrived = !walkRight(&zombie->local, world);
             break;
           case DOWN:
-            arrived = !walk_down(&letter_student->local, world);
+            arrived = !walkDown(&zombie->local, world);
             break;
         case LEFT:
-            arrived = !walk_left(&letter_student->local, world);
+            arrived = !walkLeft(&zombie->local, world);
     }
     bool walkRandomly = false;
-    if(letter_student->local.offsetX == 0 && letter_student->local.offsetY == 0){
+    if(zombie->local.offsetX == 0 && zombie->local.offsetY == 0){
         if(GetRandomValue(0,2) == 0) walkRandomly = true;
     }
-    if (GetTime() - letter_student->walkTimer >= 3 || arrived || walkRandomly)
+    if (GetTime() - zombie->walkTimer >= 3 || arrived || walkRandomly)
     {
-        letter_student->local.direction = GetRandomValue(0, 3);
-        letter_student->walkTimer = GetTime();
+        zombie->local.direction = GetRandomValue(0, 3);
+        zombie->walkTimer = GetTime();
+    }
+}
+
+void menu(player *bomberman, char **world, char *information, LIST *horde)
+{
+    for(coordinates arrow = {0, 0, 0, 0, 0}; !WindowShouldClose();/* espaço reservado para um possivel background animado*/)
+    {
+        if(IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) arrow.y = (arrow.y+2)%3;
+        if(IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) arrow.y = (arrow.y+1)%3;
+        if(IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) arrow.x = (arrow.x+1)%2;
+        if(IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) arrow.x = (arrow.x+1)%2;
+        if(IsKeyPressed(KEY_ENTER))
+        {
+            if(arrow.y == 0 && arrow.x == 0)
+            {
+                if(newGame(bomberman, world, information, horde)) break;
+            }
+            if(arrow.y == 1 && arrow.x == 0)
+            {
+                if(loadGame(bomberman, world, information, horde)) break;
+                else
+                {
+                    /*BeginDrawing();
+                        DrawText("Nao ha nenhum jogo salvo", 130, 500, 70, BLACK); inserir mensagem temporaria com pilha? aqui e no pause/gameover screen
+                    EndDrawing();*/
+                }
+            }
+            if(arrow.y == 2 && arrow.x == 0) showRecords();
+            if(arrow.y == 0 && arrow.x == 1) showControls();
+            if(arrow.y == 1 && arrow.x == 1) showDevs();
+            if(arrow.y == 2 && arrow.x == 1)
+            {
+                CloseWindow();
+            }
+        }
+        BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawText("BOMBERFELIX ", 130, 100, 100, RED);
+            DrawText("Novo jogo", 130, 250, 70, BLACK);
+            DrawText("Jogo salvo", 130, 350, 70, BLACK);
+            DrawText("Records", 130, 450, 70, BLACK);
+            DrawText("Controles", 630, 250, 70, BLACK);
+            DrawText("Criadores", 630, 350, 70, BLACK);
+            DrawText("Sair", 630, 450, 70, BLACK);
+            DrawRectangle(70 + (500*arrow.x), (100*arrow.y) + 250, 50, 50, RED);
+        EndDrawing();
+    }
+
+}
+
+void pauseGame(player *bomberman, char *information, char **world, LIST *horde)
+{
+    while(!IsKeyPressed(KEY_V))
+    {
+        if(IsKeyPressed(KEY_N))
+        {
+            if(newGame(bomberman, world, information, horde)) break;
+        }
+        if(IsKeyPressed(KEY_C))
+        {
+            if(loadGame(bomberman, world, information, horde)) break;
+        }
+        if(IsKeyPressed(KEY_M))
+        {
+            menu(bomberman, world, information, horde);
+            break;
+        }
+        if(IsKeyPressed(KEY_S)) saveGame(*bomberman, world, horde);
+        if(IsKeyPressed(KEY_R))
+        {
+            showRecords();
+            break;
+        }
+        if(IsKeyPressed(KEY_K))
+        {
+            showControls();
+            break;
+        }
+        if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
+        BeginDrawing();
+            DrawText("PAUSE", 130, 220, 150, RED);
+        EndDrawing();
     }
 }
 
 int main()
 {
     player bomberman;
-    enemy letter_student[MAX_ENEMYS];
-    int num_enemys_on = 0;
+
+    LIST horde;
+    bootList(&horde);
 
     char *information = (char *)malloc(50*sizeof(char));
     if(!information)
@@ -778,6 +946,7 @@ int main()
         return -1;
     }
     strcpy(information, "Bombas: X     Vidas: X     Pontos: X");
+
     char **world = (char **)malloc(STATURE*sizeof(char *));
     if(!world)
     {
@@ -796,51 +965,7 @@ int main()
 
     InitWindow(WIDTH*METERS, HEIGHT*METERS, "BomberFelix");
     SetTargetFPS(60);
-    for(coordinates arrow = {0, 0, 0, 0, 0}; !WindowShouldClose();/* espaço reservado para um possivel background animado*/)
-    {
-        if(IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) arrow.y = (arrow.y+2)%3;
-        if(IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) arrow.y = (arrow.y+1)%3;
-        if(IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) arrow.x = (arrow.x+1)%2;
-        if(IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) arrow.x = (arrow.x+1)%2;
-        if(IsKeyPressed(KEY_ENTER))
-        {
-            if(arrow.y == 0 && arrow.x == 0)
-            {
-                if(new_game(&bomberman, world, information, letter_student, &num_enemys_on)) break;
-            }
-            if(arrow.y == 1 && arrow.x == 0)
-            {
-                if(load_game(&bomberman, world, information, letter_student, &num_enemys_on)) break;
-                else
-                {
-                    /*BeginDrawing();
-                        DrawText("Nao ha nenhum jogo salvo", 130, 500, 70, BLACK); inserir mensagem temporaria com pilha? aqui e no pause/gameover screen
-                    EndDrawing();*/
-                }
-            }
-            if(arrow.y == 2 && arrow.x == 0) records();
-            if(arrow.y == 0 && arrow.x == 1) controls();
-            if(arrow.y == 1 && arrow.x == 1) show_devs();
-            if(arrow.y == 2 && arrow.x == 1)
-            {
-                CloseWindow();
-                return 0;
-            }
-        }
-
-
-        BeginDrawing();
-            ClearBackground(RAYWHITE);
-            DrawText("BOMBERFELIX ", 130, 100, 100, RED);
-            DrawText("Novo jogo", 130, 250, 70, BLACK);
-            DrawText("Jogo salvo", 130, 350, 70, BLACK);
-            DrawText("Records", 130, 450, 70, BLACK);
-            DrawText("Controles", 630, 250, 70, BLACK);
-            DrawText("Criadores", 630, 350, 70, BLACK);
-            DrawText("Sair", 630, 450, 70, BLACK);
-            DrawRectangle(70 + (500*arrow.x), (100*arrow.y) + 250, 50, 50, RED);
-        EndDrawing();
-    }
+    menu(&bomberman, world, information, &horde);
 
     //código abaixo para carregar as sprites. Extremamente importante esse código estar depois do initwindow
     Texture2D player_down_spr = LoadTexture("Sprites/Player/Felix_down.png");
@@ -933,26 +1058,27 @@ int main()
     while(!WindowShouldClose())
     {
         bool hasWalked = false;
-        if(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) hasWalked = walk_right(&bomberman.local, world);
+        if(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) hasWalked = walkRight(&bomberman.local, world);
         if(!hasWalked){
-            if(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) hasWalked = walk_left(&bomberman.local, world);
+            if(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) hasWalked = walkLeft(&bomberman.local, world);
             if(!hasWalked){
-                if(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) hasWalked = walk_up(&bomberman.local, world);
+                if(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) hasWalked = walkUp(&bomberman.local, world);
                 if(!hasWalked){
-                    if(IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) walk_down(&bomberman.local, world);
+                    if(IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) walkDown(&bomberman.local, world);
                 }
             }
         }
-        if(IsKeyPressed(KEY_B)) put_bomb(&bomberman, world, information);
+        if(IsKeyPressed(KEY_B)) putBomb(&bomberman, world, information);
         if(IsKeyPressed(KEY_P)) {bomberman.points += 100; printf("Pontos: %d\n", bomberman.points);}//trapaça pra testar record
-        if(IsKeyPressed(KEY_K)) lose_life(&bomberman , information, world, letter_student, &num_enemys_on);
-        if(IsKeyPressed(KEY_TAB)) pause_game(&bomberman, information, world, letter_student, &num_enemys_on);
+        if(IsKeyPressed(KEY_K)) loseLife(&bomberman , information, world, &horde);
+        if(IsKeyPressed(KEY_TAB)) pauseGame(&bomberman, information, world, &horde);
 
 
-        
-        for(int i = 0; i < num_enemys_on; i++)
+        POINTER end = horde.start;
+        while(end != NULL)
         {
-            enemy_move(&letter_student[i], world);
+            enemyMove(&end->zombie, world);
+            end = end->next;
         }
 
         
@@ -973,7 +1099,7 @@ int main()
                         *(information + 8) += 1;
 
                         //explosão onde a bomba estava
-                        Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y, &bomberman, information, world, letter_student, &num_enemys_on);
+                        Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y, &bomberman, information, world, &horde);
 
                         //cara, ta dando um monte de erro, não aguento mais namoral, to ha 7 horas fazendo isso. 
                         //precisa dessas variaveis para controlar se a explosão de cima, baixo, esquereda ou direita bateram em algo
@@ -995,7 +1121,7 @@ int main()
                                 }else{
                                 //se o bloco q sofreu impacto não é vazio...
                                 if(*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) != FREE) parou_cima = true;
-                                Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y - j, &bomberman, information, world, letter_student, &num_enemys_on);
+                                Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y - j, &bomberman, information, world, &horde);
                                 }
                             }
                             //////////////////////////////////////////////////////////////
@@ -1008,7 +1134,7 @@ int main()
                                 }else{
                                 //se o bloco q sofreu impacto não é vazio...
                                 if(*(*(world + bomberman.bombs[i].local.y + j)+ bomberman.bombs[i].local.x)!=FREE) parou_baixo = true;
-                                Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y + j, &bomberman, information, world, letter_student, &num_enemys_on);
+                                Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y + j, &bomberman, information, world, &horde);
                                 }
                             }
                             //////////////////////////////////////////////////////////////
@@ -1020,7 +1146,7 @@ int main()
                                 }else{
                                 //se o bloco q sofreu impacto não é vazio...
                                 if(*(*(world + bomberman.bombs[i].local.y)+ bomberman.bombs[i].local.x - j)!=FREE) parou_esquerda = true;
-                                Explosion_impact(bomberman.bombs[i].local.x - j, bomberman.bombs[i].local.y, &bomberman, information, world, letter_student, &num_enemys_on);
+                                Explosion_impact(bomberman.bombs[i].local.x - j, bomberman.bombs[i].local.y, &bomberman, information, world, &horde);
                                 }
                             }
                             //////////////////////////////////////////////////////////////
@@ -1032,7 +1158,7 @@ int main()
                                 }else{
                                 //se o bloco q sofreu impacto não é vazio...
                                 if(*(*(world + bomberman.bombs[i].local.y)+ bomberman.bombs[i].local.x + j)!=FREE) parou_direita = true;
-                                Explosion_impact(bomberman.bombs[i].local.x + j, bomberman.bombs[i].local.y, &bomberman, information, world, letter_student, &num_enemys_on);
+                                Explosion_impact(bomberman.bombs[i].local.x + j, bomberman.bombs[i].local.y, &bomberman, information, world, &horde);
                                 }
                             }
                             //////////////////////////////////////////////////////////////
@@ -1191,11 +1317,11 @@ int main()
                 case LEFT:
                 DrawTexture(player_left_spr, bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
             }
-            for (int i = 0; i < num_enemys_on; i++)
+            end = horde.start;
+            while(end != NULL)
             {
-                if(letter_student[i].ta_vivo){
-                DrawTexture(player_down_spr, letter_student[i].local.x * METERS + letter_student[i].local.offsetX, letter_student[i].local.y * METERS + letter_student[i].local.offsetY, RED);
-                }
+                DrawTexture(player_down_spr, end->zombie.local.x * METERS + end->zombie.local.offsetX, end->zombie.local.y * METERS + end->zombie.local.offsetY, RED);
+                end = end->next;
             }
 
             DrawText(information, 20, 520, 60, GREEN);
@@ -1221,6 +1347,7 @@ int main()
     {
         free(*(world + y));
     }
+    rebootList(&horde);
     free(world);
     CloseWindow();
     return 0;
