@@ -19,8 +19,8 @@ Thiago Barbosa da Silva - 124247625*/
 #define FREE ' '
 #define BLOCK 'W'
 #define WALL 'D'
-#define KEY_BOX 'B'
-#define EMPTY_BOX 'K'
+#define KEY_BOX 'K'
+#define EMPTY_BOX 'B'
 #define ENEMY 'E'
 #define KEY 'F'
 #define BOMB 'O'
@@ -32,6 +32,7 @@ Thiago Barbosa da Silva - 124247625*/
 #define LEFT 3
 
 #define MAX_BOMBS 3
+#define MAX_RECORDS 10
 #define TIMER_BOMB 3.0
 #define TIME_ANIMATION_BOMB 0.1
 
@@ -45,16 +46,16 @@ typedef struct
 typedef struct aux
 {
     REGISTRO reg;
-    struct aux* prox;
-} ELEMENTO;
+    struct aux* next;
+} ELEMENT_QUEUE;
 
-typedef ELEMENTO* PONT;
+typedef ELEMENT_QUEUE* POINTER_QUEUE;
 
 typedef struct
 {
-    PONT inicio;
-    PONT fim;
-} FILA;*/
+    POINTER_QUEUE start;
+    POINTER_QUEUE end;
+} QUEUE;*/
 
 typedef struct
 {
@@ -75,13 +76,13 @@ typedef struct aux
 {
     enemy zombie;
     struct aux* next;
-} ELEMENT;
+} ELEMENT_LIST;
 
-typedef ELEMENT* POINTER;
+typedef ELEMENT_LIST* POINTER_LIST;
 
 typedef struct
 {
-    POINTER start;
+    POINTER_LIST start;
 } LIST;
 
 typedef struct 
@@ -101,6 +102,7 @@ typedef struct
     char lifes;
     int points;
     bomb bombs[MAX_BOMBS];
+    char keys;
 } player;
 
 typedef struct
@@ -114,68 +116,75 @@ void bootList(LIST* horde)
     horde->start = NULL;
 }
 
-bool insertInList(LIST* horde, enemy zombie, int pos)//modificar para preencher onde estiver livre
+int sizeList(LIST* horde)
 {
-    //if(pos < 0 || pos > tamanho(horde)) return false;
-    POINTER novo = (POINTER)malloc(sizeof(ELEMENT));
-    if(!novo)
+    POINTER_LIST find = horde->start;
+    int size = 0;
+    while(find != NULL)
     {
-        puts("ERRO");
-        return false;
+        size++;
+        find = find->next;
     }
-    novo->zombie = zombie;
-    POINTER p;
-    if(pos == 0)
-    {
-        novo->next = horde->start;
-        horde->start = novo;
-    }
-    else
-    {
-        p = horde->start;
-        for(int i = 0; i < pos-1; i++) p = p->next;
-        novo->next = p->next;
-        p->next = novo;
-    }
-    return true;
+    return size;
 }
 
-bool takeFromList(LIST* horde, int pos)
+void insertInList(LIST* horde, enemy zombie)
 {
-    //if(pos < 0 || pos > tamanho(horde)-1) return false;
-    POINTER p;
-    POINTER apagar;
-    if(pos == 0)
+    POINTER_LIST new = (POINTER_LIST)malloc(sizeof(ELEMENT_LIST));
+    if(!new)
     {
-        apagar = horde->start;
-        horde->start = apagar->next;
+        puts("ERRO");
+    }
+    new->zombie = zombie;
+    POINTER_LIST find;
+    int number = sizeList(horde);
+    if(number == 0)
+    {
+        new->next = horde->start;
+        horde->start = new;
     }
     else
     {
-        p = horde->start;
-        for (int i = 0; i < pos-1; i++) p = p->next;
-        apagar = p->next;
-        p->next = apagar->next;
+        find = horde->start;
+        for(int i = 0; i < number-1; i++) find = find->next;
+        new->next = find->next;
+        find->next = new;
     }
-    free(apagar);
-    return true;
+}
+
+void takeFromList(LIST* horde, int number)
+{
+    POINTER_LIST find;
+    POINTER_LIST erase;
+    if(number == 0)
+    {
+        erase = horde->start;
+        horde->start = erase->next;
+    }
+    else
+    {
+        find = horde->start;
+        for(int i = 0; i < number-1; i++) find = find->next;
+        erase = find->next;
+        find->next = erase->next;
+    }
+    free(erase);
 }
 
 void rebootList(LIST* horde)
 {
-    POINTER end = horde->start;
-    while(end != NULL)
+    POINTER_LIST find = horde->start;
+    while(find != NULL)
     {
-        POINTER apagar = end;
-        end = end->next;
-        free(apagar);
+        POINTER_LIST erase = find;
+        find = find->next;
+        free(erase);
     }
     horde->start = NULL;
 }
 
 bool walkUp(coordinates *local, char **world)
 {
-    local->direction = UP;
     if(local->offsetY > -2)
     {
         if(local->offsetY != -10) local->offsetY -= 1;
@@ -229,7 +238,6 @@ bool walkUp(coordinates *local, char **world)
 
 bool walkRight(coordinates *local, char **world)
 {
-    local->direction = RIGHT;
     if(local->offsetX < 2)
     {
         if(local->offsetX != 10) local->offsetX += 1;
@@ -283,7 +291,6 @@ bool walkRight(coordinates *local, char **world)
 
 bool walkDown(coordinates *local, char **world)
 {
-    local->direction = DOWN;
     if(local->offsetY < 2)
     {
         if(local->offsetY != 10) local->offsetY += 1;
@@ -337,7 +344,6 @@ bool walkDown(coordinates *local, char **world)
 
 bool walkLeft(coordinates *local, char **world)
 {
-    local->direction = LEFT;
     if(local->offsetX > -2)
     {
         if(local->offsetX != -10) local->offsetX -= 1;
@@ -400,6 +406,7 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde)
 
     bomberman->lifes = '3';
     bomberman->points = 0;
+    bomberman->keys = 0;
     bomberman->local.direction = DOWN;
     bomberman->local.offsetX = 0;
     bomberman->local.offsetY = 0;
@@ -407,16 +414,17 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde)
         bomberman->bombs[i].active = false;
         bomberman->bombs[i].radio = 2;
     }
+
+    enemy zombie;
+    zombie.local.offsetX = 0;
+    zombie.local.offsetY = 0;
+    zombie.walkTimer = 0.0;
+    rebootList(horde);
+
     coordinates squares; //leitor do arquivo, vai assim: W | E  W
     squares.x = 0;
     squares.y = 0;
     char object = fgetc(file);
-    enemy inimigo_atual;
-    inimigo_atual.local.offsetX = 0;
-    inimigo_atual.local.offsetY = 0;
-    inimigo_atual.walkTimer = 0.0;
-    int number = 0;
-    rebootList(horde);
     while(!feof(file))
     {
         switch(object)
@@ -433,12 +441,11 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde)
 
 
             case ENEMY:
-            inimigo_atual.local.x = squares.x;
-            inimigo_atual.local.y = squares.y;
-            inimigo_atual.local.direction = GetRandomValue(0, 3);
+            zombie.local.x = squares.x;
+            zombie.local.y = squares.y;
+            zombie.local.direction = GetRandomValue(0, 3);
+            insertInList(horde, zombie);
             *(*(world + squares.y) + squares.x) = FREE;
-         insertInList(horde, inimigo_atual, number);
-            number++;
             break;
 
             default:
@@ -453,8 +460,8 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde)
         object = fgetc(file);
     }
     *(information + 8) = '3';
-    *(information + 21) = '3';
-    *(information + 35) = '0';
+    *(information + 21) = bomberman->lifes;
+    sprintf(information + 35, "%d", bomberman->points);
     fclose(file);
     return true;
 }
@@ -491,14 +498,12 @@ bool loadGame(player *bomberman, char **world, char *information, LIST *horde)
     fread(bomberman, sizeof(player), 1, file);
 
     rebootList(horde);
-    enemy inimigo_atual;
-    fread(&inimigo_atual, sizeof(enemy), 1, file);
-    int number = 0;
+    enemy zombie;
+    fread(&zombie, sizeof(enemy), 1, file);
     while(!feof(file))
     {
-     insertInList(horde, inimigo_atual, number);
-        fread(&inimigo_atual, sizeof(enemy), 1, file);
-        number++;
+        insertInList(horde, zombie);
+        fread(&zombie, sizeof(enemy), 1, file);
     }
 
     char active_bombs = '0';
@@ -538,11 +543,11 @@ bool saveGame(player bomberman, char **world, LIST *horde)
     fwrite(&split, sizeof(char), 1, file);
     fwrite(&bomberman, sizeof(player), 1, file);
 
-    POINTER end = horde->start;
-    while(end != NULL)
+    POINTER_LIST find = horde->start;
+    while(find != NULL)
     {
-        fwrite(&end->zombie, sizeof(enemy), 1, file);
-        end = end->next;
+        fwrite(&find->zombie, sizeof(enemy), 1, file);
+        find = find->next;
     }
 
     fclose(file);
@@ -577,16 +582,20 @@ void saveRecord(player bomberman)
     else
     {
         puts("Arquivo ja existe, verificando onde a pontuacao ficara");
-        record reading[10];
+        record *reading = (record *)malloc(MAX_RECORDS*sizeof(record));
+        if(!reading)
+        {
+            puts("ERRO");
+        }
         int check = 10;
-        for(int i = 0; i < 10; i++)
+        for(int i = 0; i < MAX_RECORDS; i++)
         {
             fread(reading+i, sizeof(record), 1, file);
             if(check == 10) if((reading+i)->points < saving.points) check = i;
         }
-        fseek(file, check*sizeof(record), SEEK_SET);
         if(check != 10)
         {
+            fseek(file, check*sizeof(record), SEEK_SET);
             printf("Pontuacao na posicao %d\n", check+1);
             puts("Digite seu nome: ");
             scanf("%s", saving.name);
@@ -602,23 +611,25 @@ void saveRecord(player bomberman)
         {
             puts("Nao obteve uma pontuacao suficiente para ser salva");
         }
+        free(reading);
     }
     fclose(file);
 }
 
-void showRecords()
+void showRecords(Music musicmenu)
 {
     FILE *file = fopen("record.dat", "rb");
     if(!file)
     {
         while(!IsKeyPressed(KEY_V))
         {
+            UpdateMusicStream(musicmenu);
             if(WindowShouldClose()) CloseWindow();
             BeginDrawing();
                 ClearBackground(RAYWHITE);
                 DrawText("RECORDS", 50, 10, 50, RED);
                 DrawText("Nome do jogador | pontuação", 350, 15, 40, RED);
-                DrawText(" 1º ---------- | 0", 40, 100, 50, BLACK);
+                DrawText(" 1º ---------- | 0", 50, 100, 50, BLACK);
                 DrawText(" 2º ---------- | 0", 40, 200, 50, BLACK);
                 DrawText(" 3º ---------- | 0", 40, 300, 50, BLACK);
                 DrawText(" 4º ---------- | 0", 40, 400, 50, BLACK);
@@ -633,60 +644,46 @@ void showRecords()
     }
     else
     {
-        record reading[10];
-        char pontos[10][50];
-        for(int i = 0; i < 10; i++)
+        record *reading = (record *)malloc(MAX_RECORDS*sizeof(record));
+        if(!reading)
+        {
+            puts("ERRO");
+        }
+        for(int i = 0; i < MAX_RECORDS; i++)
         {
             fread(reading+i, sizeof(record), 1, file);
-            sprintf(pontos[i], "%d", reading[i].points);
         }
-        while(!IsKeyPressed(KEY_V)) //ta feio q doi isso aq mas depois eu arrumo
+        while(!IsKeyPressed(KEY_V))
         {
+            UpdateMusicStream(musicmenu);
             if(WindowShouldClose()) CloseWindow();
             BeginDrawing();
                 ClearBackground(RAYWHITE);
                 DrawText("RECORDS", 50, 10, 50, RED);
                 DrawText("Nome do jogador | pontuação", 350, 15, 40, RED);
-                DrawText(" 1º             |", 50, 100, 50, BLACK);
-                DrawText(reading[0].name , 110, 100, 50, BLACK);
-                DrawText(pontos[0] , 380, 100, 50, BLACK);
-                DrawText(" 2º             |", 40, 200, 50, BLACK);
-                DrawText(reading[1].name, 110, 200, 50, BLACK);
-                DrawText(pontos[1], 380, 200, 50, BLACK);
-                DrawText(" 3º             |", 40, 300, 50, BLACK);
-                DrawText(reading[2].name , 110, 300, 50, BLACK);
-                DrawText(pontos[2] , 380, 300, 50, BLACK);
-                DrawText(" 4º             |", 40, 400, 50, BLACK);
-                DrawText(reading[3].name , 110, 400, 50, BLACK);
-                DrawText(pontos[3] , 380, 400, 50, BLACK);
-                DrawText(" 5º             |", 40, 500, 50, BLACK);
-                DrawText(reading[4].name , 110, 500, 50, BLACK);
-                DrawText(pontos[4] , 380, 500, 50, BLACK);
-                DrawText(" 6º             |", 600, 100, 50, BLACK);
-                DrawText(reading[5].name , 670, 100, 50, BLACK);
-                DrawText(pontos[5] , 940, 100, 50, BLACK);
-                DrawText(" 7º             |", 600, 200, 50, BLACK);
-                DrawText(reading[6].name , 670, 200, 50, BLACK);
-                DrawText(pontos[6] , 940, 200, 50, BLACK);
-                DrawText(" 8º             |", 600, 300, 50, BLACK);
-                DrawText(reading[7].name , 670, 300, 50, BLACK);
-                DrawText(pontos[7] , 940, 300, 50, BLACK);
-                DrawText(" 9º             |", 600, 400, 50, BLACK);
-                DrawText(reading[8].name , 670, 400, 50, BLACK);
-                DrawText(pontos[8] , 940, 400, 50, BLACK);
-                DrawText("10º             |", 600, 500, 50, BLACK);
-                DrawText(reading[9].name , 670, 500, 50, BLACK);
-                DrawText(pontos[9] , 940, 500, 50, BLACK);
+                int i = 0;
+                for(int j = 1; i < MAX_RECORDS/2; j++)
+                {
+                    DrawText(TextFormat("%dº %s | %d", i+1, (reading+i)->name, (reading+i)->points), 40, 100*j, 50, BLACK);
+                    i++;
+                }
+                for(int j = 1; i < MAX_RECORDS; j++)
+                {
+                    DrawText(TextFormat("%dº %s | %d", i+1, (reading+i)->name, (reading+i)->points), 600, 100*j, 50, BLACK);
+                    i++;
+                }
             EndDrawing();
         }
+        free(reading);
     }
     fclose(file);
 }
 
-void showControls()
+void showControls(Music musicmenu)
 {
     while(!IsKeyPressed(KEY_V))
     {
+        UpdateMusicStream(musicmenu);
         if(WindowShouldClose()) CloseWindow();
         BeginDrawing();
             ClearBackground(RAYWHITE);
@@ -705,7 +702,7 @@ void showControls()
 
 void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife)
 {
-    if(bomberman->points >=100) bomberman->points -= 100;//falta mudar a informacao dos pontos
+    if(bomberman->points >=100) bomberman->points -= 100;
     else bomberman->points = 0;
     sprintf(information + 35 , "%d", bomberman->points);
     bomberman->lifes -= 1;
@@ -713,6 +710,10 @@ void loseLife(player *bomberman, char *information, char **world, LIST *horde, S
     if(bomberman->lifes <= '0')
     {
         PlaySound(loss);
+        BeginDrawing();
+            DrawText("GAME OVER", 130, 220, 150, RED);
+        EndDrawing();
+        saveRecord(*bomberman);
         while(!IsKeyPressed(KEY_J))//tecla temporaria
         {
             if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
@@ -724,21 +725,21 @@ void loseLife(player *bomberman, char *information, char **world, LIST *horde, S
             {
                 if(loadGame(bomberman, world, information, horde)) break;
             }
-            DrawRectangle(620, 520, 60, 60, RAYWHITE);
-            DrawText("0", 640, 520, 60, GREEN);
+            //DrawRectangle(620, 520, 60, 60, RAYWHITE);
+            //DrawText("0", 640, 520, 60, GREEN);
             BeginDrawing();
-            DrawText("GAME OVER", 130, 220, 150, RED);
+                DrawText("GAME OVER", 130, 220, 150, RED);
             EndDrawing();
         }
-        saveRecord(*bomberman);
     }
     else PlaySound(lostlife);
 }
 
-void showDevs()
+void showDevs(Music musicmenu)
 {
     while(!IsKeyPressed(KEY_V))
     {
+        UpdateMusicStream(musicmenu);
         if(WindowShouldClose()) CloseWindow();
         BeginDrawing();
             ClearBackground(RAYWHITE);
@@ -798,16 +799,14 @@ void Explosion_impact(int x, int y, player *bomberman, char *information, char *
         loseLife(bomberman, information, world, horde, loss, lostlife);
     }
     //bem simples também, apenas passo pelo número de inimigos ativo e desativo eles. Aproveito e aumento os points dele, para facilitar o trabalho do Henzel (minha vez de roubar trampo muahahahahhahah)
-    POINTER end = horde->start;
-    int number = 0;
-    while(end != NULL){
-        if(end->zombie.local.x == x && end->zombie.local.y == y){
+    POINTER_LIST find = horde->start;
+    for(int number = 0; find != NULL; number++){
+        if(find->zombie.local.x == x && find->zombie.local.y == y){
             takeFromList(horde, number);
             bomberman->points +=20;
             sprintf(information + 35 , "%d", bomberman->points);
         }
-        number++;
-        end = end->next;
+        find = find->next;
     }
 
     char *cell = *(world + y) + x;
@@ -826,16 +825,15 @@ void Explosion_impact(int x, int y, player *bomberman, char *information, char *
 void enemyMove(enemy *zombie, char **world)
 {
     bool arrived = false;
-    //Henzel amassou com essas funções aqui ta
     switch(zombie->local.direction)
     {
         case UP:
             arrived = !walkUp(&zombie->local, world);
             break;
-         case RIGHT:
+        case RIGHT:
             arrived = !walkRight(&zombie->local, world);
             break;
-          case DOWN:
+        case DOWN:
             arrived = !walkDown(&zombie->local, world);
             break;
         case LEFT:
@@ -877,9 +875,9 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
                     EndDrawing();*/
                 }
             }
-            if(arrow.y == 2 && arrow.x == 0) showRecords();
-            if(arrow.y == 0 && arrow.x == 1) showControls();
-            if(arrow.y == 1 && arrow.x == 1) showDevs();
+            if(arrow.y == 2 && arrow.x == 0) showRecords(musicmenu);
+            if(arrow.y == 0 && arrow.x == 1) showControls(musicmenu);
+            if(arrow.y == 1 && arrow.x == 1) showDevs(musicmenu);
             if(arrow.y == 2 && arrow.x == 1)
             {
                 CloseWindow();
@@ -897,7 +895,6 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
             DrawRectangle(70 + (500*arrow.x), (100*arrow.y) + 250, 50, 50, RED);
         EndDrawing();
     }
-
 }
 
 void pauseGame(player *bomberman, char *information, char **world, LIST *horde, Music musicmenu)
@@ -920,12 +917,12 @@ void pauseGame(player *bomberman, char *information, char **world, LIST *horde, 
         if(IsKeyPressed(KEY_S)) saveGame(*bomberman, world, horde);
         if(IsKeyPressed(KEY_R))
         {
-            showRecords();
+            showRecords(musicmenu);
             break;
         }
         if(IsKeyPressed(KEY_K))
         {
-            showControls();
+            showControls(musicmenu);
             break;
         }
         if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
@@ -1107,31 +1104,26 @@ int main()
     while(!WindowShouldClose())
     {
         UpdateMusicStream(musicmap1);
-        int lastdirection = -1;
-        if(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) if(walkRight(&bomberman.local, world)) lastdirection = RIGHT;
-        if(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) if(walkLeft(&bomberman.local, world)) lastdirection = LEFT;
-        if(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) if(walkUp(&bomberman.local, world)) lastdirection = UP;
-        if(IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) if(walkDown(&bomberman.local, world)) lastdirection = DOWN;
-        if (lastdirection != -1) bomberman.local.direction = lastdirection;
+        if(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) if(walkRight(&bomberman.local, world)) bomberman.local.direction = RIGHT;
+        if(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) if(walkLeft(&bomberman.local, world)) bomberman.local.direction = LEFT;
+        if(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) if(walkUp(&bomberman.local, world)) bomberman.local.direction = UP;
+        if(IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) if(walkDown(&bomberman.local, world)) bomberman.local.direction = DOWN;
         if(IsKeyPressed(KEY_B)) putBomb(&bomberman, world, information);
-        if(IsKeyPressed(KEY_P)) {bomberman.points += 100; printf("Pontos: %d\n", bomberman.points);}//trapaça pra testar record
-        if(IsKeyPressed(KEY_K)) loseLife(&bomberman , information, world, &horde, losssound, lostlifesound);
         if(IsKeyPressed(KEY_TAB)){
             double *times = (double*)malloc(sizeof(double)*MAX_BOMBS);
-            for(int i = 0; i < MAX_BOMBS; i++) times[i] = TIMER_BOMB - (GetTime() - bomberman.bombs[i].planttime);
+            for(int i = 0; i < MAX_BOMBS; i++) *(times+i) = TIMER_BOMB - (GetTime() - bomberman.bombs[i].planttime);
             pauseGame(&bomberman, information, world, &horde, musicmenu);
-            for(int i = 0; i < MAX_BOMBS; i++) bomberman.bombs[i].planttime = GetTime() - (TIMER_BOMB - times[i]);
+            for(int i = 0; i < MAX_BOMBS; i++) bomberman.bombs[i].planttime = GetTime() - (TIMER_BOMB - *(times+i));
+            free(times);
         }
 
-
-        POINTER end = horde.start;
-        while(end != NULL)
+        POINTER_LIST alive = horde.start;
+        while(alive != NULL)
         {
-            enemyMove(&end->zombie, world);
-            end = end->next;
+            enemyMove(&alive->zombie, world);
+            alive = alive->next;
         }
 
-        
         for(int i = 0; i < MAX_BOMBS; i++)
         {
             if(bomberman.bombs[i].active)
@@ -1238,12 +1230,11 @@ int main()
                 }
             }
         }
-        //PRECISA EXIBIR AS PONTUAÇÕES, O NUMERO DE BOMBAS, O DE VIDA E O de PONTOS, n sei como o henzel fez, mas precisa fazer dnv :D
 
         BeginDrawing();
             ClearBackground(RAYWHITE);
             //adicionando textura no chao inteiro
-            //primeiro eu crio um triangulo do tamanho da tela
+            //primeiro eu crio um triangulo do sizeList da tela
             Rectangle sourceRec = {0.0, 0.0, WIDTH*METERS, 500}; // o motivo de ser 500 e não HEIGHT e pq ali em baixo fica a hud ne, se quiser entender melhor troca isso para "HEIGHT"
             //esse código desenha o sprite no retangulo criado. Como o sprite(tam: 20x20) é bem menor que o retangulo (tam: tela), ele vai preenchendo até cobrir tudo
             DrawTextureRec(floor_spr, sourceRec, origin, WHITE);
@@ -1282,13 +1273,13 @@ int main()
             for(int i = 0; i< MAX_BOMBS; i++){
                 if(bomberman.bombs[i].active){//se ta ativa
                     if(!bomberman.bombs[i].Exploding){//se ta plantada
-                        DrawTexture(bomb_spr, bomberman.bombs[i].local.x *METERS, bomberman.bombs[i].local.y * METERS, WHITE);
+                        DrawTexture(bomb_spr, bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                     }
                     else{//se ta fazendo kabum
                         int frame = bomberman.bombs[i].explosion_frame;
                         if(frame < 3){
 
-                            DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x * METERS, bomberman.bombs[i].local.y * METERS, WHITE);
+                            DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
 
                             bool para_cima_desenho = false;
                             bool para_baixo_desenho = false;
@@ -1302,7 +1293,7 @@ int main()
                             if (*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) == BLOCK) {
                                 para_cima_desenho = true;
                             } else {
-                                DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x * METERS, (bomberman.bombs[i].local.y - j) * METERS, WHITE);
+                                DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, WHITE);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) != FREE) para_cima_desenho = true;
                             }
@@ -1314,7 +1305,7 @@ int main()
                             if (*(*(world + bomberman.bombs[i].local.y + j) + bomberman.bombs[i].local.x) == BLOCK) {
                                 para_baixo_desenho = true;
                             } else {
-                                DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x * METERS, (bomberman.bombs[i].local.y + j) * METERS, WHITE);
+                                DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, WHITE);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y + j) + bomberman.bombs[i].local.x) != FREE) para_baixo_desenho = true;
                             }
@@ -1326,7 +1317,7 @@ int main()
                             if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x - j) == BLOCK) {
                                 para_esquerda_desenho = true;
                             } else {
-                                DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x - j) * METERS, bomberman.bombs[i].local.y * METERS, WHITE);
+                                DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x - j) != FREE) para_esquerda_desenho = true;
                             }
@@ -1338,7 +1329,7 @@ int main()
                             if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x + j) == BLOCK) {
                                 para_direita_desenho = true;
                             } else {
-                                DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x + j) * METERS, bomberman.bombs[i].local.y * METERS, WHITE);
+                                DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x + j) != FREE) para_direita_desenho = true;
                             }
@@ -1367,11 +1358,11 @@ int main()
                 case LEFT:
                 DrawTexture(player_left_spr, bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
             }
-            end = horde.start;
-            while(end != NULL)
+            alive = horde.start;
+            while(alive != NULL)
             {
-                DrawTexture(player_down_spr, end->zombie.local.x * METERS + end->zombie.local.offsetX, end->zombie.local.y * METERS + end->zombie.local.offsetY, RED);
-                end = end->next;
+                DrawTexture(player_down_spr, alive->zombie.local.x*METERS + alive->zombie.local.offsetX, alive->zombie.local.y*METERS + alive->zombie.local.offsetY, RED);
+                alive = alive->next;
             }
 
             DrawText(information, 20, 520, 60, GREEN);
