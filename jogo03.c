@@ -118,7 +118,7 @@ typedef struct
 
 typedef struct
 {
-    char name[11];
+    char name[13];
     int points;
 } record;
 
@@ -408,7 +408,8 @@ bool walkLeft(coordinates *local, char **world)
 
 bool newGame(player *bomberman, char **world, char *information, LIST *horde)
 {
-    FILE *file = fopen("world.txt", "r");
+    FILE *file = fopen("world1.txt", "r");
+    //FILE *file = fopen("world2.txt", "r");
     if(!file)
     {
         puts("ERRO - O nivel nao pode ser aberto");
@@ -570,10 +571,77 @@ bool saveGame(player bomberman, char **world, LIST *horde)
     return true;
 }
 
+void write(char *name)
+{
+    int letter = 0;
+    while(!WindowShouldClose())
+    {
+        if(IsKeyPressed(KEY_A)) {*(name+letter) = 'a'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_B)) {*(name+letter) = 'b'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_C)) {*(name+letter) = 'c'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_D)) {*(name+letter) = 'd'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_E)) {*(name+letter) = 'e'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_F)) {*(name+letter) = 'f'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_G)) {*(name+letter) = 'g'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_H)) {*(name+letter) = 'h'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_I)) {*(name+letter) = 'i'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_J)) {*(name+letter) = 'j'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_K)) {*(name+letter) = 'k'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_L)) {*(name+letter) = 'l'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_M)) {*(name+letter) = 'm'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_N)) {*(name+letter) = 'n'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_O)) {*(name+letter) = 'o'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_P)) {*(name+letter) = 'p'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_Q)) {*(name+letter) = 'q'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_R)) {*(name+letter) = 'r'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_S)) {*(name+letter) = 's'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_T)) {*(name+letter) = 't'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_U)) {*(name+letter) = 'u'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_V)) {*(name+letter) = 'v'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_W)) {*(name+letter) = 'w'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_X)) {*(name+letter) = 'x'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_Y)) {*(name+letter) = 'y'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_Z)) {*(name+letter) = 'z'; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_SPACE)) {*(name+letter) = ' '; *(name+letter+1) = '|'; letter++;}
+        if(IsKeyPressed(KEY_BACKSPACE)) if(letter > 0) {*(name+letter-1) = '|'; *(name+letter) = ' '; letter--;}
+
+        BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawText("DIGITE SEU NOME", 400, 100, 50, BLACK);
+            DrawText(name, 40, 100, 50, BLACK);
+        EndDrawing();
+
+        if(IsKeyPressed(KEY_ENTER) || letter == 10)
+        {
+            while(!IsKeyPressed(KEY_S))
+            {
+                BeginDrawing();
+                    DrawText("O NOME ESTA CORRETO?", 40, 300, 50, BLACK);
+                    DrawText("Pressione (S) para sim ou (N) para não", 40, 500, 50, BLACK);
+                EndDrawing();
+                if(IsKeyPressed(KEY_N))
+                {
+                    *(name+letter) = ' ';
+                    letter = 0;
+                    *(name+letter) = '|';
+                    break;
+                }
+            }
+            if(letter)
+            {
+                *(name+10) = ' ';
+                *(name+11) = '|';
+                break;
+            }
+        }
+    }
+}
+
 void saveRecord(player bomberman)
 {
     record saving;
     saving.points = bomberman.points;
+    strcpy(saving.name,"|          ");
     FILE *file = fopen("record.dat", "rb+");
     if(!file)
     {
@@ -583,9 +651,15 @@ void saveRecord(player bomberman)
         {
             puts("ERRO - O record nao pode ser salvo");
         }
-        puts("Digite seu nome: ");
-        scanf("%s", saving.name);
-        fgetc(stdin);
+        while(!IsKeyPressed(KEY_ENTER))
+        {
+            BeginDrawing();
+                ClearBackground(RAYWHITE);
+                DrawText("VOCÊ É O PRIMEIRO A SALVAR SUA PONTUAÇÃO", 300, 300, 50, BLACK);
+                DrawText("Pressione ENTER para continuar", 300, 500, 50, BLACK);
+            EndDrawing();
+        }
+        write(saving.name);
         fwrite(&saving, sizeof(record), 1, file);
         strcpy(saving.name, "----------");
         saving.points = 0;
@@ -603,21 +677,27 @@ void saveRecord(player bomberman)
         {
             puts("ERRO");
         }
-        int check = 10;
+        int position = 10;
         for(int i = 0; i < MAX_RECORDS; i++)
         {
             fread(reading+i, sizeof(record), 1, file);
-            if(check == 10) if((reading+i)->points < saving.points) check = i;
+            if(position == 10) if((reading+i)->points < saving.points) position = i;
         }
-        if(check != 10)
+        if(position != 10)
         {
-            fseek(file, check*sizeof(record), SEEK_SET);
-            printf("Pontuacao na posicao %d\n", check+1);
-            puts("Digite seu nome: ");
-            scanf("%s", saving.name);
-            fgetc(stdin);
+            fseek(file, position*sizeof(record), SEEK_SET);
+            while(!IsKeyPressed(KEY_ENTER))
+            {
+                BeginDrawing();
+                    ClearBackground(RAYWHITE);
+                    if(!position) DrawText("PARABENS SUA PONTUAÇÃO É A MELHOR", 300, 300, 50, BLACK);
+                    else DrawText(TextFormat("PARABENS SUA PONTUAÇÃO É A %dº MELHOR", position+1), 300, 300, 50, BLACK);
+                    DrawText("Pressione ENTER para continuar", 300, 500, 50, BLACK);
+                EndDrawing();
+            }
+            write(saving.name);
             fwrite(&saving, sizeof(record), 1, file);
-            for(int j = check; j < 9; j++)
+            for(int j = position; j < 9; j++)
             {
                 fwrite(reading+j, sizeof(record), 1, file);
             }
@@ -677,16 +757,16 @@ void showRecords(Music musicmenu)
                 ClearBackground(RAYWHITE);
                 DrawText("RECORDS", 50, 10, 50, RED);
                 DrawText("Nome do jogador | pontuação", 350, 15, 40, RED);
-                int i = 0;
-                for(int j = 1; i < MAX_RECORDS/2; j++)
+                int position = 0;
+                for(int j = 1; position < MAX_RECORDS/2; j++)
                 {
-                    DrawText(TextFormat("%dº %s | %d", i+1, (reading+i)->name, (reading+i)->points), 40, 100*j, 50, BLACK);
-                    i++;
+                    DrawText(TextFormat("%dº %s %d", position+1, (reading+position)->name, (reading+position)->points), 40, 100*j, 50, BLACK);
+                    position++;
                 }
-                for(int j = 1; i < MAX_RECORDS; j++)
+                for(int j = 1; position < MAX_RECORDS; j++)
                 {
-                    DrawText(TextFormat("%dº %s | %d", i+1, (reading+i)->name, (reading+i)->points), 600, 100*j, 50, BLACK);
-                    i++;
+                    DrawText(TextFormat("%dº %s %d", position+1, (reading+position)->name, (reading+position)->points), 600, 100*j, 50, BLACK);
+                    position++;
                 }
             EndDrawing();
         }
@@ -714,41 +794,6 @@ void showControls(Music musicmenu)
             DrawText("V - VOLTAR", 600, 400, 50, BLACK);
         EndDrawing();
     }
-}
-
-void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife)
-{
-    if(bomberman->points >=100) bomberman->points -= 100;
-    else bomberman->points = 0;
-    sprintf(information + 35 , "%d", bomberman->points);
-    bomberman->lifes -= 1;
-    *(information + 21) -= 1;
-    if(bomberman->lifes <= '0')
-    {
-        PlaySound(loss);
-        BeginDrawing();
-            DrawText("GAME OVER", 130, 220, 150, RED);
-        EndDrawing();
-        saveRecord(*bomberman);
-        while(!IsKeyPressed(KEY_J))//tecla temporaria
-        {
-            if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
-            if(IsKeyPressed(KEY_N))
-            {
-                if (newGame(bomberman, world, information, horde)) break;
-            }
-            if(IsKeyPressed(KEY_C))
-            {
-                if(loadGame(bomberman, world, information, horde)) break;
-            }
-            //DrawRectangle(620, 520, 60, 60, RAYWHITE);
-            //DrawText("0", 640, 520, 60, GREEN);
-            BeginDrawing();
-                DrawText("GAME OVER", 130, 220, 150, RED);
-            EndDrawing();
-        }
-    }
-    else PlaySound(lostlife);
 }
 
 void showDevs(Music musicmenu)
@@ -809,34 +854,6 @@ void putBomb(player *bomberman, char **world, char *information)
             *(information + 8) -= 1;
             }
         }
-    }
-}
-
-void Explosion_impact(int x, int y, player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife){
-    if(bomberman->local.x == x && bomberman->local.y == y){
-        loseLife(bomberman, information, world, horde, loss, lostlife);
-    }
-    //bem simples também, apenas passo pelo número de inimigos ativo e desativo eles. Aproveito e aumento os points dele, para facilitar o trabalho do Henzel (minha vez de roubar trampo muahahahahhahah)
-    POINTER_LIST find = horde->start;
-    for(int number = 0; find != NULL; number++){
-        if(find->zombie.local.x == x && find->zombie.local.y == y){
-            takeFromList(horde, number);
-            bomberman->points +=20;
-            sprintf(information + 35 , "%d", bomberman->points);
-        }
-        find = find->next;
-    }
-
-    char *cell = *(world + y) + x;
-    if(*cell == WALL || *cell == EMPTY_BOX){
-        *cell = EXPLODING_WALL;
-        bomberman->points += 10;
-        sprintf(information + 35 , "%d", bomberman->points);
-    }
-    else if(*cell == KEY_BOX){
-        *cell = KEY;
-        bomberman->points += 10;
-        sprintf(information + 35 , "%d", bomberman->points);
     }
 }
 
@@ -912,6 +929,60 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
             DrawText("Sair", 630, 450, 70, BLACK);
             DrawRectangle(70 + (500*arrow.x), (100*arrow.y) + 250, 50, 50, RED);
         EndDrawing();
+    }
+}
+
+void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu)
+{
+    if(bomberman->points >=100) bomberman->points -= 100;
+    else bomberman->points = 0;
+    sprintf(information + 35 , "%d", bomberman->points);
+    bomberman->lifes -= 1;
+    *(information + 21) -= 1;
+    if(bomberman->lifes <= '0')
+    {
+        PlaySound(loss);
+        while(!IsKeyPressed(KEY_B))
+        {
+            if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
+            BeginDrawing();
+                DrawText("GAME OVER", 130, 220, 150, RED);
+                DrawText("Precione B para continuar", 100, 320, 80, RED);
+                DrawRectangle(0, STATURE*METERS, WIDTH*METERS, 5*METERS,RAYWHITE);
+                DrawText(information, 20, 520, 60, GREEN);
+            EndDrawing();
+        }
+        saveRecord(*bomberman);
+        menu(bomberman, world, information, horde, musicmenu);
+    }
+    else PlaySound(lostlife);
+}
+
+void Explosion_impact(int x, int y, player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu){
+    if(bomberman->local.x == x && bomberman->local.y == y){
+        loseLife(bomberman, information, world, horde, loss, lostlife, musicmenu);
+    }
+    //bem simples também, apenas passo pelo número de inimigos ativo e desativo eles. Aproveito e aumento os points dele, para facilitar o trabalho do Henzel (minha vez de roubar trampo muahahahahhahah)
+    POINTER_LIST find = horde->start;
+    for(int number = 0; find != NULL; number++){
+        if(find->zombie.local.x == x && find->zombie.local.y == y){
+            takeFromList(horde, number);
+            bomberman->points +=20;
+            sprintf(information + 35 , "%d", bomberman->points);
+        }
+        find = find->next;
+    }
+
+    char *cell = *(world + y) + x;
+    if(*cell == WALL || *cell == EMPTY_BOX){
+        *cell = EXPLODING_WALL;
+        bomberman->points += 10;
+        sprintf(information + 35 , "%d", bomberman->points);
+    }
+    else if(*cell == KEY_BOX){
+        *cell = KEY;
+        bomberman->points += 10;
+        sprintf(information + 35 , "%d", bomberman->points);
     }
 }
 
@@ -1347,7 +1418,7 @@ int main()
                         *(information + 8) += 1;
 
                         //explosão onde a bomba estava
-                        Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y, &bomberman, information, world, &horde, losssound, lostlifesound);
+                        Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y, &bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
 
                         //cara, ta dando um monte de erro, não aguento mais namoral, to ha 7 horas fazendo isso. 
                         //precisa dessas variaveis para controlar se a explosão de cima, baixo, esquereda ou direita bateram em algo
@@ -1369,7 +1440,7 @@ int main()
                                 }else{
                                 //se o bloco q sofreu impacto não é vazio...
                                 if(*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) != FREE) parou_cima = true;
-                                Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y - j, &bomberman, information, world, &horde, losssound, lostlifesound);
+                                Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y - j, &bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                                 }
                             }
                             //////////////////////////////////////////////////////////////
@@ -1382,7 +1453,7 @@ int main()
                                 }else{
                                 //se o bloco q sofreu impacto não é vazio...
                                 if(*(*(world + bomberman.bombs[i].local.y + j)+ bomberman.bombs[i].local.x)!=FREE) parou_baixo = true;
-                                Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y + j, &bomberman, information, world, &horde, losssound, lostlifesound);
+                                Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y + j, &bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                                 }
                             }
                             //////////////////////////////////////////////////////////////
@@ -1394,7 +1465,7 @@ int main()
                                 }else{
                                 //se o bloco q sofreu impacto não é vazio...
                                 if(*(*(world + bomberman.bombs[i].local.y)+ bomberman.bombs[i].local.x - j)!=FREE) parou_esquerda = true;
-                                Explosion_impact(bomberman.bombs[i].local.x - j, bomberman.bombs[i].local.y, &bomberman, information, world, &horde, losssound, lostlifesound);
+                                Explosion_impact(bomberman.bombs[i].local.x - j, bomberman.bombs[i].local.y, &bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                                 }
                             }
                             //////////////////////////////////////////////////////////////
@@ -1406,7 +1477,7 @@ int main()
                                 }else{
                                 //se o bloco q sofreu impacto não é vazio...
                                 if(*(*(world + bomberman.bombs[i].local.y)+ bomberman.bombs[i].local.x + j)!=FREE) parou_direita = true;
-                                Explosion_impact(bomberman.bombs[i].local.x + j, bomberman.bombs[i].local.y, &bomberman, information, world, &horde, losssound, lostlifesound);
+                                Explosion_impact(bomberman.bombs[i].local.x + j, bomberman.bombs[i].local.y, &bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                                 }
                             }
                             //////////////////////////////////////////////////////////////
