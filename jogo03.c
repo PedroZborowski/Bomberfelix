@@ -30,11 +30,15 @@ Thiago Barbosa da Silva - 124247625*/
 #define RIGHT 1
 #define DOWN 2
 #define LEFT 3
+#define PLAYER_ANIM_SPEED 0.15
+#define PLAYER_ANIM_SPEED_IDLE 1
 
 #define MAX_BOMBS 3
 #define MAX_RECORDS 10
 #define TIMER_BOMB 3.0
 #define TIME_ANIMATION_BOMB 0.1
+#define TIME_ANIMATION_BOMB_NOT_EXPLOSION 0.5
+
 
 /*typedef int TIPOCHAVE;
 
@@ -56,6 +60,7 @@ typedef struct
     POINTER_QUEUE start;
     POINTER_QUEUE end;
 } QUEUE;*/
+
 
 typedef struct
 {
@@ -94,6 +99,8 @@ typedef struct
     double explosion_timer;//para animação
     int explosion_frame;//para animação
     bool Exploding; //para animação
+    int frame_atual_bomb;
+    double animation_timer_bomb;
 } bomb;
 
 typedef struct
@@ -103,6 +110,10 @@ typedef struct
     int points;
     bomb bombs[MAX_BOMBS];
     char keys;
+
+    int state;
+    int Frame_atual;
+    double animation_timer;
 } player;
 
 typedef struct
@@ -410,6 +421,11 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde)
     bomberman->local.direction = DOWN;
     bomberman->local.offsetX = 0;
     bomberman->local.offsetY = 0;
+
+    bomberman->state = 0; //inicia parado
+    bomberman->Frame_atual = 0;
+    bomberman->animation_timer = 0.0;
+
     for(int i = 0; i < MAX_BOMBS; i++){
         bomberman->bombs[i].active = false;
         bomberman->bombs[i].radio = 2;
@@ -785,6 +801,8 @@ void putBomb(player *bomberman, char **world, char *information)
 
             bomberman->bombs[i].planttime = GetTime();
             bomberman->bombs[i].active = true;
+            bomberman->bombs[i].frame_atual_bomb = 0;      // para animação
+            bomberman->bombs[i].animation_timer_bomb = GetTime(); // para aniamção
             bomberman->bombs[i].Exploding = false;//para animação
             bomberman->bombs[i].explosion_frame = 0; //para animação
             bomberman->bombs[i].explosion_timer = 0.0; //para animação
@@ -1015,24 +1033,62 @@ int main()
     menu(&bomberman, world, information, &horde, musicmenu);
     PlayMusicStream(musicmap1);
     //código abaixo para carregar as sprites. Extremamente importante esse código estar depois do initwindow
-    Texture2D player_down_spr = LoadTexture("Sprites/Player/Felix_down.png");
-    Texture2D player_up_spr = LoadTexture("Sprites/Player/Felix_up.png");
-    Texture2D player_left_spr = LoadTexture("Sprites/Player/Felix_left.png");
-    Texture2D player_right_spr = LoadTexture("Sprites/Player/Felix_right.png");
     Texture2D wall_spr = LoadTexture("Sprites/cenario/parede.png");
     Texture2D box_spr = LoadTexture("Sprites/cenario/caixa.png");
     Texture2D explosible_spr = LoadTexture("Sprites/cenario/parede_destrutivel.png");
     Texture2D key_spr = LoadTexture("Sprites/interagiveis/chave.png");
     Texture2D floor_spr = LoadTexture("Sprites/cenario/chao.png");
-    Texture2D bomb_spr = LoadTexture("Sprites/interagiveis/bomb.png");
+    Texture2D bomb_animation[2];
+    bomb_animation[0] = LoadTexture("Sprites/timing/bomb_black.png");
+    bomb_animation[1] = LoadTexture("Sprites/timing/bomb_red.png");
+
+
     Texture2D explosion_spr[3];
     explosion_spr[0] = LoadTexture("Sprites/explosao/explosao1.png");
     explosion_spr[1] = LoadTexture("Sprites/explosao/explosao2.png");
     explosion_spr[2] = LoadTexture("Sprites/explosao/explosao3.png");
+    Texture2D player_walk_down[4];
+    player_walk_down[0] = LoadTexture("Sprites/Player/Felix_walk_down1.png");
+    player_walk_down[1] = LoadTexture("Sprites/Player/Felix_walk_down2.png");
+    player_walk_down[2] = LoadTexture("Sprites/Player/Felix_walk_down3.png");
+    player_walk_down[3] = LoadTexture("Sprites/Player/Felix_walk_down4.png");
+    Texture2D player_walk_up[4];
+    player_walk_up[0] = LoadTexture("Sprites/Player/Felix_walk_up1.png");
+    player_walk_up[1] = LoadTexture("Sprites/Player/Felix_walk_up2.png");
+    player_walk_up[2] = LoadTexture("Sprites/Player/Felix_walk_up3.png");
+    player_walk_up[3] = LoadTexture("Sprites/Player/Felix_walk_up4.png");
+    Texture2D player_walk_left[4];
+    player_walk_left[0] = LoadTexture("Sprites/Player/Felix_walk_esq1.png");
+    player_walk_left[1] = LoadTexture("Sprites/Player/Felix_walk_esq2.png");
+    player_walk_left[2] = LoadTexture("Sprites/Player/Felix_walk_esq3.png");
+    player_walk_left[3] = LoadTexture("Sprites/Player/Felix_walk_esq4.png");
+    Texture2D player_walk_rigth[4];
+    player_walk_rigth[0] = LoadTexture("Sprites/Player/Felix_walk_dir1.png");
+    player_walk_rigth[1] = LoadTexture("Sprites/Player/Felix_walk_dir2.png");
+    player_walk_rigth[2] = LoadTexture("Sprites/Player/Felix_walk_dir3.png");
+    player_walk_rigth[3] = LoadTexture("Sprites/Player/Felix_walk_dir4.png");
+    Texture2D player_idle_down[2];
+    player_idle_down[0] = LoadTexture("Sprites/Player/Felix_idle_down1.png");
+    player_idle_down[1] = LoadTexture("Sprites/Player/Felix_idle_down2.png");
+    Texture2D player_idle_up[2];
+    player_idle_up[0] = LoadTexture("Sprites/Player/Felix_idle_up1.png");
+    player_idle_up[1] = LoadTexture("Sprites/Player/Felix_idle_up2.png");
+    Texture2D player_idle_left[2];
+    player_idle_left[0] = LoadTexture("Sprites/Player/Felix_idle_esq1.png");
+    player_idle_left[1] = LoadTexture("Sprites/Player/Felix_idle_esq2.png");
+    Texture2D player_idle_right[2];
+    player_idle_right[0] = LoadTexture("Sprites/Player/Felix_idle_dir1.png");
+    player_idle_right[1] = LoadTexture("Sprites/Player/Felix_idle_dir2.png");
+
 
     //segundo o site oficial, checa se a textura e valida e esta carregada na GPU, retorna TRUE 
-    if(!IsTextureValid(bomb_spr)){
-        puts("ERRO - Nao foi possivel achar o sprite da bomba.");
+    if(!IsTextureValid(bomb_animation[0])){
+        puts("ERRO - Nao foi possivel achar o sprite 1 da bomba.");
+        CloseWindow();
+        return -1;
+    }
+        if(!IsTextureValid(bomb_animation[1])){
+        puts("ERRO - Nao foi possivel achar o sprite 2 da bomba.");
         CloseWindow();
         return -1;
     }
@@ -1043,31 +1099,128 @@ int main()
             return 1;
         }
     }
-        
-    if(!IsTextureValid(player_down_spr) )
-    {
-        puts("ERRO - Nao foi possivel achar o sprite do Felix_down.");
+     if (!IsTextureValid(player_walk_down[0])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_down1.png");
         CloseWindow();
-        return 1;    
+        return 1;
     }
-    if(!IsTextureValid(player_up_spr) )
-    {
-        puts("ERRO - Nao foi possivel achar o sprite do Felix_up.");
+    if (!IsTextureValid(player_walk_down[1])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_down2.png");
         CloseWindow();
-        return 1;    
+        return 1;
     }
-    if(!IsTextureValid(player_right_spr) )
-    {
-        puts("ERRO - Nao foi possivel achar o sprite do Felix_right.");
+    if (!IsTextureValid(player_walk_down[2])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_down3.png");
         CloseWindow();
-        return 1;    
+        return 1;
     }
-    if(!IsTextureValid(player_left_spr) )
-    {
-        puts("ERRO - Nao foi possivel achar o sprite do Felix_left.");
+    if (!IsTextureValid(player_walk_down[3])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_down4.png");
         CloseWindow();
-        return 1;    
+        return 1;
     }
+    if (!IsTextureValid(player_walk_up[0])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_up1.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_walk_up[1])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_up2.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_walk_up[2])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_up3.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_walk_up[3])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_up4.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_walk_left[0])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_esq1.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_walk_left[1])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_esq2.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_walk_left[2])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_esq3.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_walk_left[3])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_esq4.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_walk_rigth[0])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_dir1.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_walk_rigth[1])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_dir2.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_walk_rigth[2])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_dir3.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_walk_rigth[3])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_walk_dir4.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_idle_down[0])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_idle_down1.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_idle_down[1])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_idle_down2.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_idle_up[0])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_idle_up1.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_idle_up[1])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_idle_up2.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_idle_left[0])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_idle_esq1.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_idle_left[1])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_idle_esq2.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_idle_right[0])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_idle_dir1.png");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(player_idle_right[1])) {
+        puts("ERRO - Nao foi possivel achar o sprite Felix_idle_dir2.png");
+        CloseWindow();
+        return 1;
+    }
+
+
     if(!IsTextureValid(wall_spr))
     {
         puts("ERRO - Nao foi possivel achar o sprite da parede.");
@@ -1104,10 +1257,63 @@ int main()
     while(!WindowShouldClose())
     {
         UpdateMusicStream(musicmap1);
-        if(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) if(walkRight(&bomberman.local, world)) bomberman.local.direction = RIGHT;
-        if(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) if(walkLeft(&bomberman.local, world)) bomberman.local.direction = LEFT;
-        if(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) if(walkUp(&bomberman.local, world)) bomberman.local.direction = UP;
-        if(IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) if(walkDown(&bomberman.local, world)) bomberman.local.direction = DOWN;
+        bool tamovendo = false;
+            if (IsKeyPressed(KEY_F11)) ToggleFullscreen();
+    
+        if(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)){
+            if(walkRight(&bomberman.local, world)){
+                 bomberman.local.direction = RIGHT;
+                 tamovendo=true;
+            }
+        }
+        if(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)){
+            if(walkLeft(&bomberman.local, world)){
+                bomberman.local.direction = LEFT;
+                tamovendo = true;
+            }
+        }
+        if(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)){
+            if(walkUp(&bomberman.local, world)){
+                bomberman.local.direction = UP;
+                tamovendo = true;
+            }
+        }
+        if(IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)){
+            if(walkDown(&bomberman.local, world)){
+                bomberman.local.direction = DOWN;
+                tamovendo = true;
+            }
+        }
+        if(tamovendo == true){
+            if(bomberman.state != 1){ //to usando 0 para parado e 1 para andando
+                bomberman.state = 1;
+                bomberman.Frame_atual = 0; //reinicia o frame ao mudar o estado do meu mano
+            }
+        }
+        else{
+            if(bomberman.state != 0){
+                bomberman.state = 0;
+                bomberman.Frame_atual = 0;
+            }
+        }
+    if (bomberman.state == 1) { 
+        if (GetTime() - bomberman.animation_timer > PLAYER_ANIM_SPEED) {
+            bomberman.Frame_atual++;
+            bomberman.animation_timer = GetTime();
+        }
+        if (bomberman.Frame_atual >= 4) {
+            bomberman.Frame_atual = 0;
+        }
+    } 
+    else {
+        if (GetTime() - bomberman.animation_timer > PLAYER_ANIM_SPEED_IDLE) {
+            bomberman.Frame_atual++;
+            bomberman.animation_timer = GetTime();
+        }
+        if (bomberman.Frame_atual >= 2) {
+            bomberman.Frame_atual = 0;
+        }
+    }
         if(IsKeyPressed(KEY_B)) putBomb(&bomberman, world, information);
         if(IsKeyPressed(KEY_TAB)){
             double *times = (double*)malloc(sizeof(double)*MAX_BOMBS);
@@ -1273,7 +1479,14 @@ int main()
             for(int i = 0; i< MAX_BOMBS; i++){
                 if(bomberman.bombs[i].active){//se ta ativa
                     if(!bomberman.bombs[i].Exploding){//se ta plantada
-                        DrawTexture(bomb_spr, bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
+                        DrawTexture(bomb_animation[bomberman.bombs[i].frame_atual_bomb], bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
+                        if(GetTime() - bomberman.bombs[i].animation_timer_bomb > TIME_ANIMATION_BOMB_NOT_EXPLOSION){
+                            bomberman.bombs[i].frame_atual_bomb ++;
+                            bomberman.bombs[i].animation_timer_bomb = GetTime();
+                        }
+                        if(bomberman.bombs[i].frame_atual_bomb >= 2){
+                            bomberman.bombs[i].frame_atual_bomb = 0;
+                        }
                     }
                     else{//se ta fazendo kabum
                         int frame = bomberman.bombs[i].explosion_frame;
@@ -1344,24 +1557,44 @@ int main()
             switch(bomberman.local.direction)
             {
                 case UP:
-                DrawTexture(player_up_spr, bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                if(bomberman.state == 1){
+                DrawTexture(player_walk_up[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                }
+                else{
+                    DrawTexture(player_idle_up[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                }
                 break;
 
                 case RIGHT:
-                DrawTexture(player_right_spr, bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                if(bomberman.state == 1){
+                DrawTexture(player_walk_rigth[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                }
+                else{
+                    DrawTexture(player_idle_right[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                }
                 break;
 
                 case DOWN:
-                DrawTexture(player_down_spr, bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                if(bomberman.state == 1){
+                DrawTexture(player_walk_down[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                }
+                else{
+                    DrawTexture(player_idle_down[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                }
                 break;
 
                 case LEFT:
-                DrawTexture(player_left_spr, bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                if(bomberman.state == 1){
+                DrawTexture(player_walk_left[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                }
+                else{
+                     DrawTexture(player_idle_left[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                }
             }
             alive = horde.start;
             while(alive != NULL)
             {
-                DrawTexture(player_down_spr, alive->zombie.local.x*METERS + alive->zombie.local.offsetX, alive->zombie.local.y*METERS + alive->zombie.local.offsetY, RED);
+                DrawTexture(player_walk_rigth[0], alive->zombie.local.x*METERS + alive->zombie.local.offsetX, alive->zombie.local.y*METERS + alive->zombie.local.offsetY, RED);
                 alive = alive->next;
             }
 
@@ -1370,16 +1603,25 @@ int main()
     }
 
     //Necessário para descarregar as texturas
-    UnloadTexture(player_down_spr);
-    UnloadTexture(player_up_spr);
-    UnloadTexture(player_right_spr);
-    UnloadTexture(player_left_spr);
+    for (int i = 0; i < 4; i++) {
+        UnloadTexture(player_walk_down[i]);
+        UnloadTexture(player_walk_up[i]);
+        UnloadTexture(player_walk_left[i]);
+        UnloadTexture(player_walk_rigth[i]);
+    }
+    for (int i = 0; i < 2; i++) {
+        UnloadTexture(player_idle_down[i]);
+        UnloadTexture(player_idle_up[i]);
+        UnloadTexture(player_idle_left[i]);
+        UnloadTexture(player_idle_right[i]);
+    }
+    UnloadTexture(bomb_animation[0]);
+    UnloadTexture(bomb_animation[1]);
     UnloadTexture(wall_spr);
     UnloadTexture(explosible_spr);
     UnloadTexture(box_spr);
     UnloadTexture(key_spr);
     UnloadTexture(floor_spr);
-    UnloadTexture(bomb_spr);
     UnloadMusicStream(musicmap1);
     UnloadMusicStream(musicmap2);
     UnloadMusicStream(musicmenu);

@@ -203,7 +203,7 @@ int main()
     Texture2D floor_spr = LoadTexture("Sprites/cenario/chao.png");
 
     //segundo o site oficial, checa se a textura e valida e esta carregada na GPU, retorna TRUE 
-    if(!IsTextureValid(player_down_spr) )
+    if(!IsTextureValidplayer_walk_rigth) )
     {
         puts("ERRO - Nao foi possivel achar o sprite do Felix_down.");
         CloseWindow();
@@ -315,7 +315,7 @@ int main()
                 break;
 
                 case DOWN:
-                DrawTexture(player_down_spr, bomberman.local.x*METERS, bomberman.local.y*METERS, WHITE);
+                DrawTextureplayer_walk_rigth, bomberman.local.x*METERS, bomberman.local.y*METERS, WHITE);
                 break;
 
                 case LEFT:
@@ -327,7 +327,7 @@ int main()
     }
 
     //Necessário para descarregar as texturas
-    UnloadTexture(player_down_spr);
+    UnloadTextureplayer_walk_rigth);
     UnloadTexture(player_up_spr);
     UnloadTexture(player_right_spr);
     UnloadTexture(player_left_spr);
