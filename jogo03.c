@@ -412,6 +412,19 @@ bool walkLeft(coordinates *local, char **world)
     return false;
 }
 
+void closeGame()
+{
+    while(!IsKeyPressed(KEY_N))
+    {
+        if(IsKeyPressed(KEY_S)) CloseWindow();
+        BeginDrawing();
+            DrawRectangle(200, 200, 300, 300, BLUE);
+            DrawText("Tem certeza de que quer sair?", 300, 300, 50, BLACK);
+            DrawText("Precisone S para sim e N para nao", 300, 450, 50, BLACK);
+        EndDrawing();
+    }
+}
+
 bool newGame(player *bomberman, char **world, char *information, LIST *horde)
 {
     FILE *file = fopen("world1.txt", "r");
@@ -577,10 +590,10 @@ bool saveGame(player bomberman, char **world, LIST *horde)
     return true;
 }
 
-void write(char *name)
+void writeName(char *name)
 {
     int letter = 0;
-    while(!WindowShouldClose())
+    while(letter >= 0)
     {
         if(IsKeyPressed(KEY_A)) {*(name+letter) = 'a'; *(name+letter+1) = '|'; letter++;}
         if(IsKeyPressed(KEY_B)) {*(name+letter) = 'b'; *(name+letter+1) = '|'; letter++;}
@@ -610,6 +623,7 @@ void write(char *name)
         if(IsKeyPressed(KEY_Z)) {*(name+letter) = 'z'; *(name+letter+1) = '|'; letter++;}
         if(IsKeyPressed(KEY_SPACE)) {*(name+letter) = ' '; *(name+letter+1) = '|'; letter++;}
         if(IsKeyPressed(KEY_BACKSPACE)) if(letter > 0) {*(name+letter-1) = '|'; *(name+letter) = ' '; letter--;}
+        if(WindowShouldClose()) closeGame();
 
         BeginDrawing();
             ClearBackground(RAYWHITE);
@@ -627,14 +641,14 @@ void write(char *name)
                 EndDrawing();
                 if(IsKeyPressed(KEY_N))
                 {
-                    *(name+letter) = ' ';
+                    strcpy(name,"|          ");
                     letter = 0;
-                    *(name+letter) = '|';
                     break;
                 }
             }
             if(letter)
             {
+                *(name+letter) = ' ';
                 *(name+10) = ' ';
                 *(name+11) = '|';
                 break;
@@ -659,13 +673,14 @@ void saveRecord(player bomberman)
         }
         while(!IsKeyPressed(KEY_ENTER))
         {
+            if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
             BeginDrawing();
                 ClearBackground(RAYWHITE);
                 DrawText("VOCÊ É O PRIMEIRO A SALVAR SUA PONTUAÇÃO", 300, 300, 50, BLACK);
                 DrawText("Pressione ENTER para continuar", 300, 500, 50, BLACK);
             EndDrawing();
         }
-        write(saving.name);
+        writeName(saving.name);
         fwrite(&saving, sizeof(record), 1, file);
         strcpy(saving.name, "----------");
         saving.points = 0;
@@ -694,6 +709,7 @@ void saveRecord(player bomberman)
             fseek(file, position*sizeof(record), SEEK_SET);
             while(!IsKeyPressed(KEY_ENTER))
             {
+                if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
                 BeginDrawing();
                     ClearBackground(RAYWHITE);
                     if(!position) DrawText("PARABENS SUA PONTUAÇÃO É A MELHOR", 300, 300, 50, BLACK);
@@ -701,7 +717,7 @@ void saveRecord(player bomberman)
                     DrawText("Pressione ENTER para continuar", 300, 500, 50, BLACK);
                 EndDrawing();
             }
-            write(saving.name);
+            writeName(saving.name);
             fwrite(&saving, sizeof(record), 1, file);
             for(int j = position; j < 9; j++)
             {
@@ -726,7 +742,7 @@ void showRecords(Music musicmenu)
         while(!IsKeyPressed(KEY_V))
         {
             UpdateMusicStream(musicmenu);
-            if(WindowShouldClose()) CloseWindow();
+            if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
             BeginDrawing();
                 ClearBackground(RAYWHITE);
                 DrawText("RECORDS", 50, 10, 50, RED);
@@ -758,7 +774,7 @@ void showRecords(Music musicmenu)
         while(!IsKeyPressed(KEY_V))
         {
             UpdateMusicStream(musicmenu);
-            if(WindowShouldClose()) CloseWindow();
+            if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
             BeginDrawing();
                 ClearBackground(RAYWHITE);
                 DrawText("RECORDS", 50, 10, 50, RED);
@@ -786,7 +802,7 @@ void showControls(Music musicmenu)
     while(!IsKeyPressed(KEY_V))
     {
         UpdateMusicStream(musicmenu);
-        if(WindowShouldClose()) CloseWindow();
+        if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
         BeginDrawing();
             ClearBackground(RAYWHITE);
             DrawText("CONTROLES", 50, 10, 50, RED);
@@ -807,7 +823,7 @@ void showDevs(Music musicmenu)
     while(!IsKeyPressed(KEY_V))
     {
         UpdateMusicStream(musicmenu);
-        if(WindowShouldClose()) CloseWindow();
+        if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
         BeginDrawing();
             ClearBackground(RAYWHITE);
             DrawText("DESENVOLVEDORES", 250, 0, 50, RED);
@@ -954,7 +970,7 @@ void loseLife(player *bomberman, char *information, char **world, LIST *horde, S
             PlaySound(loss);
             while(!IsKeyPressed(KEY_B))
             {
-                if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
+                if(IsKeyPressed(KEY_Q) || WindowShouldClose()) closeGame();
                 BeginDrawing();
                     DrawText("GAME OVER", 130, 220, 150, RED);
                     DrawText("Precione B para continuar", 100, 320, 80, RED);
@@ -1022,7 +1038,7 @@ void pauseGame(player *bomberman, char *information, char **world, LIST *horde, 
             showControls(musicmenu);
             break;
         }
-        if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
+        if(IsKeyPressed(KEY_Q) || WindowShouldClose()) closeGame();
         BeginDrawing();
             DrawText("PAUSE", 130, 220, 150, RED);
         EndDrawing();
