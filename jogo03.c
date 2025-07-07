@@ -38,6 +38,7 @@ Thiago Barbosa da Silva - 124247625*/
 #define TIMER_BOMB 3.0
 #define TIME_ANIMATION_BOMB 0.1
 #define TIME_ANIMATION_BOMB_NOT_EXPLOSION 0.5
+#define IFRAMES 1
 
 
 /*typedef int TIPOCHAVE;
@@ -110,6 +111,7 @@ typedef struct
     int points;
     bomb bombs[MAX_BOMBS];
     char keys;
+    double lastDmg;
 
     int state;
     int Frame_atual;
@@ -245,6 +247,10 @@ bool walkUp(coordinates *local, char **world)
         return true;
     }
     return false;
+}
+
+bool checkHitbox(Rectangle plrhb, Rectangle otherhb){
+    return CheckCollisionRecs(plrhb, otherhb);
 }
 
 bool walkRight(coordinates *local, char **world)
@@ -887,7 +893,8 @@ void enemyMove(enemy *zombie, char **world)
 
 void menu(player *bomberman, char **world, char *information, LIST *horde, Music musicmenu)
 {
-    for(coordinates arrow = {0, 0, 0, 0, 0}; !WindowShouldClose();/* espaço reservado para um possivel background animado*/)
+    coordinates arrow = {0, 0, 0, 0, 0};
+    while(!arrow.direction)
     {
         UpdateMusicStream(musicmenu);
         if(IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) arrow.y = (arrow.y+2)%3;
@@ -918,6 +925,7 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
                 CloseWindow();
             }
         }
+        if(WindowShouldClose() || IsKeyPressed(KEY_Q)) CloseWindow();
         BeginDrawing();
             ClearBackground(RAYWHITE);
             DrawText("BOMBERFELIX ", 130, 100, 100, RED);
@@ -934,34 +942,34 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
 
 void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu)
 {
-    if(bomberman->points >=100) bomberman->points -= 100;
-    else bomberman->points = 0;
-    sprintf(information + 35 , "%d", bomberman->points);
-    bomberman->lifes -= 1;
-    *(information + 21) -= 1;
-    if(bomberman->lifes <= '0')
-    {
-        PlaySound(loss);
-        while(!IsKeyPressed(KEY_B))
+    if(GetTime() - bomberman->lastDmg >= IFRAMES){
+        bomberman->lastDmg = GetTime();
+        if(bomberman->points >=100) bomberman->points -= 100;
+        else bomberman->points = 0;
+        sprintf(information + 35 , "%d", bomberman->points);
+        bomberman->lifes -= 1;
+        *(information + 21) -= 1;
+        if(bomberman->lifes <= '0')
         {
-            if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
-            BeginDrawing();
-                DrawText("GAME OVER", 130, 220, 150, RED);
-                DrawText("Precione B para continuar", 100, 320, 80, RED);
-                DrawRectangle(0, STATURE*METERS, WIDTH*METERS, 5*METERS,RAYWHITE);
-                DrawText(information, 20, 520, 60, GREEN);
-            EndDrawing();
+            PlaySound(loss);
+            while(!IsKeyPressed(KEY_B))
+            {
+                if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
+                BeginDrawing();
+                    DrawText("GAME OVER", 130, 220, 150, RED);
+                    DrawText("Precione B para continuar", 100, 320, 80, RED);
+                    DrawRectangle(0, STATURE*METERS, WIDTH*METERS, 5*METERS,RAYWHITE);
+                    DrawText(information, 20, 520, 60, GREEN);
+                EndDrawing();
+            }
+            saveRecord(*bomberman);
+            menu(bomberman, world, information, horde, musicmenu);
         }
-        saveRecord(*bomberman);
-        menu(bomberman, world, information, horde, musicmenu);
+        else PlaySound(lostlife);
     }
-    else PlaySound(lostlife);
 }
 
-void Explosion_impact(int x, int y, player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu){
-    if(bomberman->local.x == x && bomberman->local.y == y){
-        loseLife(bomberman, information, world, horde, loss, lostlife, musicmenu);
-    }
+void Explosion_impact(int x, int y, player *bomberman, char *information, char **world, LIST *horde){
     //bem simples também, apenas passo pelo número de inimigos ativo e desativo eles. Aproveito e aumento os points dele, para facilitar o trabalho do Henzel (minha vez de roubar trampo muahahahahhahah)
     POINTER_LIST find = horde->start;
     for(int number = 0; find != NULL; number++){
@@ -1024,7 +1032,7 @@ void pauseGame(player *bomberman, char *information, char **world, LIST *horde, 
 int main()
 {
     player bomberman;
-
+    bomberman.lastDmg = 0;
     LIST horde;
     bootList(&horde);
 
@@ -1393,14 +1401,6 @@ int main()
             for(int i = 0; i < MAX_BOMBS; i++) bomberman.bombs[i].planttime = GetTime() - (TIMER_BOMB - *(times+i));
             free(times);
         }
-
-        POINTER_LIST alive = horde.start;
-        while(alive != NULL)
-        {
-            enemyMove(&alive->zombie, world);
-            alive = alive->next;
-        }
-
         for(int i = 0; i < MAX_BOMBS; i++)
         {
             if(bomberman.bombs[i].active)
@@ -1418,7 +1418,7 @@ int main()
                         *(information + 8) += 1;
 
                         //explosão onde a bomba estava
-                        Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y, &bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
+                        Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y, &bomberman, information, world, &horde);
 
                         //cara, ta dando um monte de erro, não aguento mais namoral, to ha 7 horas fazendo isso. 
                         //precisa dessas variaveis para controlar se a explosão de cima, baixo, esquereda ou direita bateram em algo
@@ -1440,7 +1440,7 @@ int main()
                                 }else{
                                 //se o bloco q sofreu impacto não é vazio...
                                 if(*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) != FREE) parou_cima = true;
-                                Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y - j, &bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
+                                Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y - j, &bomberman, information, world, &horde);
                                 }
                             }
                             //////////////////////////////////////////////////////////////
@@ -1453,7 +1453,7 @@ int main()
                                 }else{
                                 //se o bloco q sofreu impacto não é vazio...
                                 if(*(*(world + bomberman.bombs[i].local.y + j)+ bomberman.bombs[i].local.x)!=FREE) parou_baixo = true;
-                                Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y + j, &bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
+                                Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y + j, &bomberman, information, world, &horde);
                                 }
                             }
                             //////////////////////////////////////////////////////////////
@@ -1465,7 +1465,7 @@ int main()
                                 }else{
                                 //se o bloco q sofreu impacto não é vazio...
                                 if(*(*(world + bomberman.bombs[i].local.y)+ bomberman.bombs[i].local.x - j)!=FREE) parou_esquerda = true;
-                                Explosion_impact(bomberman.bombs[i].local.x - j, bomberman.bombs[i].local.y, &bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
+                                Explosion_impact(bomberman.bombs[i].local.x - j, bomberman.bombs[i].local.y, &bomberman, information, world, &horde);
                                 }
                             }
                             //////////////////////////////////////////////////////////////
@@ -1477,7 +1477,7 @@ int main()
                                 }else{
                                 //se o bloco q sofreu impacto não é vazio...
                                 if(*(*(world + bomberman.bombs[i].local.y)+ bomberman.bombs[i].local.x + j)!=FREE) parou_direita = true;
-                                Explosion_impact(bomberman.bombs[i].local.x + j, bomberman.bombs[i].local.y, &bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
+                                Explosion_impact(bomberman.bombs[i].local.x + j, bomberman.bombs[i].local.y, &bomberman, information, world, &horde);
                                 }
                             }
                             //////////////////////////////////////////////////////////////
@@ -1514,6 +1514,7 @@ int main()
             //primeiro eu crio um triangulo do sizeList da tela
             Rectangle sourceRec = {0.0, 0.0, WIDTH*METERS, 500}; // o motivo de ser 500 e não HEIGHT e pq ali em baixo fica a hud ne, se quiser entender melhor troca isso para "HEIGHT"
             //esse código desenha o sprite no retangulo criado. Como o sprite(tam: 20x20) é bem menor que o retangulo (tam: tela), ele vai preenchendo até cobrir tudo
+            Rectangle playerhb = {bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, 16, 16};
             DrawTextureRec(floor_spr, sourceRec, origin, WHITE);
             for(int y = 0; y < STATURE; y++)
             {
@@ -1538,7 +1539,15 @@ int main()
                         break;
 
                         case KEY:
-                        DrawTexture(key_spr, x*METERS, y*METERS, WHITE);
+                        Rectangle keyhb = {20, 20, x*METERS, y*METERS};
+                        if(checkHitbox(playerhb, keyhb)){
+                            PlaySound(obtainedkeysound);
+                            bomberman.keys += 1;
+                            *(*(world + y) + x) = FREE;
+                        }
+                        else{
+                            DrawTexture(key_spr, x*METERS, y*METERS, WHITE);
+                        }
                         break;
                         
                         case EXPLODING_WALL:
@@ -1564,7 +1573,8 @@ int main()
                         if(frame < 3){
 
                             DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
-
+                            Rectangle exphb = {20,20, bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS};
+                            if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                             bool para_cima_desenho = false;
                             bool para_baixo_desenho = false;
                             bool para_esquerda_desenho = false;
@@ -1578,6 +1588,8 @@ int main()
                                 para_cima_desenho = true;
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, WHITE);
+                                Rectangle exphb = {20,20, bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS};
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) != FREE) para_cima_desenho = true;
                             }
@@ -1590,6 +1602,8 @@ int main()
                                 para_baixo_desenho = true;
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, WHITE);
+                                Rectangle exphb = {20,20, bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS};
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y + j) + bomberman.bombs[i].local.x) != FREE) para_baixo_desenho = true;
                             }
@@ -1602,6 +1616,8 @@ int main()
                                 para_esquerda_desenho = true;
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
+                                Rectangle exphb = {20,20, (bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS};
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x - j) != FREE) para_esquerda_desenho = true;
                             }
@@ -1614,6 +1630,8 @@ int main()
                                 para_direita_desenho = true;
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
+                                Rectangle exphb = {20,20, (bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS};
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x + j) != FREE) para_direita_desenho = true;
                             }
@@ -1662,13 +1680,15 @@ int main()
                      DrawTexture(player_idle_left[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
                 }
             }
-            alive = horde.start;
+            POINTER_LIST alive = horde.start;
             while(alive != NULL)
             {
+                enemyMove(&alive->zombie, world);
                 DrawTexture(player_walk_rigth[0], alive->zombie.local.x*METERS + alive->zombie.local.offsetX, alive->zombie.local.y*METERS + alive->zombie.local.offsetY, RED);
+                Rectangle enemyhb = {alive->zombie.local.x*METERS + alive->zombie.local.offsetX, alive->zombie.local.y*METERS + alive->zombie.local.offsetY, 16, 16};
+                if(checkHitbox(playerhb, enemyhb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                 alive = alive->next;
             }
-
             DrawText(information, 20, 520, 60, GREEN);
         EndDrawing();
     }
