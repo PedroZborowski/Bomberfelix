@@ -1589,7 +1589,7 @@ int main()
                         if(frame < 3){
 
                             DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
-                            Rectangle exphb = {20,20, bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS};
+                            Rectangle exphb = {bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
                             if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                             bool para_cima_desenho = false;
                             bool para_baixo_desenho = false;
@@ -1604,7 +1604,7 @@ int main()
                                 para_cima_desenho = true;
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, WHITE);
-                                Rectangle exphb = {20,20, bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS};
+                                Rectangle exphb = {bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, 20,20};
                                 if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) != FREE) para_cima_desenho = true;
@@ -1618,7 +1618,7 @@ int main()
                                 para_baixo_desenho = true;
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, WHITE);
-                                Rectangle exphb = {20,20, bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS};
+                                Rectangle exphb = {bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, 20,20};
                                 if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y + j) + bomberman.bombs[i].local.x) != FREE) para_baixo_desenho = true;
@@ -1632,7 +1632,7 @@ int main()
                                 para_esquerda_desenho = true;
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
-                                Rectangle exphb = {20,20, (bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS};
+                                Rectangle exphb = {(bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
                                 if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x - j) != FREE) para_esquerda_desenho = true;
@@ -1646,7 +1646,7 @@ int main()
                                 para_direita_desenho = true;
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
-                                Rectangle exphb = {20,20, (bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS};
+                                Rectangle exphb = {(bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
                                 if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x + j) != FREE) para_direita_desenho = true;
