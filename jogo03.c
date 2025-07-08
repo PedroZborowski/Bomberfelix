@@ -907,7 +907,7 @@ void enemyMove(enemy *zombie, char **world)
     }
 }
 
-void menu(player *bomberman, char **world, char *information, LIST *horde, Music musicmenu)
+void menu(player *bomberman, char **world, char *information, LIST *horde, Music musicmenu, Texture2D capa)
 {
     coordinates arrow = {0, 0, 0, 0, 0};
     while(!arrow.direction)
@@ -944,19 +944,19 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
         if(WindowShouldClose() || IsKeyPressed(KEY_Q)) CloseWindow();
         BeginDrawing();
             ClearBackground(RAYWHITE);
-            DrawText("BOMBERFELIX ", 130, 100, 100, RED);
-            DrawText("Novo jogo", 130, 250, 70, BLACK);
-            DrawText("Jogo salvo", 130, 350, 70, BLACK);
-            DrawText("Records", 130, 450, 70, BLACK);
-            DrawText("Controles", 630, 250, 70, BLACK);
-            DrawText("Criadores", 630, 350, 70, BLACK);
-            DrawText("Sair", 630, 450, 70, BLACK);
-            DrawRectangle(70 + (500*arrow.x), (100*arrow.y) + 250, 50, 50, RED);
+            DrawTexture(capa, 0, 0, WHITE);
+            DrawText("Novo jogo", 130, 290, 70, GREEN);
+            DrawText("Jogo salvo", 130, 390, 70, GREEN);
+            DrawText("Records", 130, 490, 70, GREEN);
+            DrawText("Controles", 630, 290, 70, GREEN);
+            DrawText("Criadores", 630, 390, 70, GREEN);
+            DrawText("Sair", 630, 490, 70, GREEN);
+            DrawRectangle(70 + (500*arrow.x), (100*arrow.y) + 290, 50, 50, PURPLE);
         EndDrawing();
     }
 }
 
-void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu)
+void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu, Texture2D capa)
 {
     if(GetTime() - bomberman->lastDmg >= IFRAMES){
         bomberman->lastDmg = GetTime();
@@ -979,7 +979,7 @@ void loseLife(player *bomberman, char *information, char **world, LIST *horde, S
                 EndDrawing();
             }
             saveRecord(*bomberman);
-            menu(bomberman, world, information, horde, musicmenu);
+            menu(bomberman, world, information, horde, musicmenu, capa);
         }
         else PlaySound(lostlife);
     }
@@ -1010,7 +1010,7 @@ void Explosion_impact(int x, int y, player *bomberman, char *information, char *
     }
 }
 
-void pauseGame(player *bomberman, char *information, char **world, LIST *horde, Music musicmenu)
+void pauseGame(player *bomberman, char *information, char **world, LIST *horde, Music musicmenu, Texture2D capa)
 {
     while(!IsKeyPressed(KEY_V))
     {
@@ -1024,7 +1024,7 @@ void pauseGame(player *bomberman, char *information, char **world, LIST *horde, 
         }
         if(IsKeyPressed(KEY_M))
         {
-            menu(bomberman, world, information, horde, musicmenu);
+            menu(bomberman, world, information, horde, musicmenu, capa);
             break;
         }
         if(IsKeyPressed(KEY_S)) saveGame(*bomberman, world, horde);
@@ -1125,14 +1125,23 @@ int main()
     musicmap1.looping = true;
     musicmap2.looping = true;
     PlayMusicStream(musicmenu);
-    menu(&bomberman, world, information, &horde, musicmenu);
+    Texture2D capa = LoadTexture("Sprites/bomberfelix.jpeg");
+    if(!IsTextureValid(capa))
+    {
+        puts("ERRO - Nao foi possivel achar o sprite da capa.");
+        CloseWindow();
+        return 1;    
+    }
+    menu(&bomberman, world, information, &horde, musicmenu, capa);
     PlayMusicStream(musicmap1);
     //código abaixo para carregar as sprites. Extremamente importante esse código estar depois do initwindow
     Texture2D wall_spr = LoadTexture("Sprites/cenario/parede.png");
     Texture2D box_spr = LoadTexture("Sprites/cenario/caixa.png");
     Texture2D explosible_spr = LoadTexture("Sprites/cenario/parede_destrutivel.png");
     Texture2D key_spr = LoadTexture("Sprites/interagiveis/chave.png");
+    Texture2D whitekey_spr = LoadTexture("Sprites/interagiveis/chavewhite.png");
     Texture2D floor_spr = LoadTexture("Sprites/cenario/chao.png");
+    Texture2D in = LoadTexture("Sprites/cenario/in.png");
     Texture2D bomb_animation[2];
     bomb_animation[0] = LoadTexture("Sprites/timing/bomb_black.png");
     bomb_animation[1] = LoadTexture("Sprites/timing/bomb_red.png");
@@ -1194,7 +1203,7 @@ int main()
             return 1;
         }
     }
-     if (!IsTextureValid(player_walk_down[0])) {
+    if (!IsTextureValid(player_walk_down[0])) {
         puts("ERRO - Nao foi possivel achar o sprite Felix_walk_down1.png");
         CloseWindow();
         return 1;
@@ -1314,8 +1323,6 @@ int main()
         CloseWindow();
         return 1;
     }
-
-
     if(!IsTextureValid(wall_spr))
     {
         puts("ERRO - Nao foi possivel achar o sprite da parede.");
@@ -1334,11 +1341,22 @@ int main()
         CloseWindow();
         return 1;    
     }
+    if(!IsTextureValid(in))
+    {
+        puts("ERRO - Nao foi possivel achar o sprite da porta da entrada.");
+        CloseWindow();
+        return 1;    
+    }
     if(!IsTextureValid(key_spr))
     {
         puts("ERRO - Nao foi possivel achar o sprite da chave.");
         CloseWindow();
         return 1;    
+    }
+    if(!IsTextureValid(whitekey_spr)){
+        puts("Erro - Nao foi possivel achar o sprite da chave com fundo branco.");
+        CloseWindow();
+        return 1;
     }
     if(!IsTextureValid(floor_spr))
     {
@@ -1413,7 +1431,7 @@ int main()
         if(IsKeyPressed(KEY_TAB)){
             double *times = (double*)malloc(sizeof(double)*MAX_BOMBS);
             for(int i = 0; i < MAX_BOMBS; i++) *(times+i) = TIMER_BOMB - (GetTime() - bomberman.bombs[i].planttime);
-            pauseGame(&bomberman, information, world, &horde, musicmenu);
+            pauseGame(&bomberman, information, world, &horde, musicmenu, capa);
             for(int i = 0; i < MAX_BOMBS; i++) bomberman.bombs[i].planttime = GetTime() - (TIMER_BOMB - *(times+i));
             free(times);
         }
@@ -1555,7 +1573,7 @@ int main()
                         break;
 
                         case KEY:
-                        Rectangle keyhb = {20, 20, x*METERS, y*METERS};
+                        Rectangle keyhb = {x*METERS, y*METERS, 20, 20};
                         if(checkHitbox(playerhb, keyhb)){
                             PlaySound(obtainedkeysound);
                             bomberman.keys += 1;
@@ -1568,6 +1586,10 @@ int main()
                         
                         case EXPLODING_WALL:
                         DrawTexture(explosion_spr[0], x*METERS, y*METERS, WHITE);
+                        break;
+
+                        case 'I':
+                        DrawTexture(in, x*METERS, y*METERS, WHITE);
                     }
                 }
             }
@@ -1590,7 +1612,7 @@ int main()
 
                             DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                             Rectangle exphb = {bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                            if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
+                            if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa);
                             bool para_cima_desenho = false;
                             bool para_baixo_desenho = false;
                             bool para_esquerda_desenho = false;
@@ -1605,7 +1627,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, WHITE);
                                 Rectangle exphb = {bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) != FREE) para_cima_desenho = true;
                             }
@@ -1619,7 +1641,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, WHITE);
                                 Rectangle exphb = {bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y + j) + bomberman.bombs[i].local.x) != FREE) para_baixo_desenho = true;
                             }
@@ -1633,7 +1655,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                                 Rectangle exphb = {(bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x - j) != FREE) para_esquerda_desenho = true;
                             }
@@ -1647,7 +1669,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                                 Rectangle exphb = {(bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x + j) != FREE) para_direita_desenho = true;
                             }
@@ -1702,10 +1724,14 @@ int main()
                 enemyMove(&alive->zombie, world);
                 DrawTexture(player_walk_rigth[0], alive->zombie.local.x*METERS + alive->zombie.local.offsetX, alive->zombie.local.y*METERS + alive->zombie.local.offsetY, RED);
                 Rectangle enemyhb = {alive->zombie.local.x*METERS + alive->zombie.local.offsetX, alive->zombie.local.y*METERS + alive->zombie.local.offsetY, 16, 16};
-                if(checkHitbox(playerhb, enemyhb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu);
+                if(checkHitbox(playerhb, enemyhb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa);
                 alive = alive->next;
             }
-            DrawText(information, 20, 520, 60, GREEN);
+            DrawText(information, 20, 530, 50, GREEN);
+            DrawText(TextFormat("%.1lf", GetTime()), 1140, 580, 20, BLACK);
+            for(int i = 0; i < bomberman.keys; i++){
+                DrawTexture(whitekey_spr, 1000+i*35, 540, WHITE);
+            }
         EndDrawing();
     }
 
