@@ -38,7 +38,9 @@ Thiago Barbosa da Silva - 124247625*/
 #define TIMER_BOMB 3.0
 #define TIME_ANIMATION_BOMB 0.1
 #define TIME_ANIMATION_BOMB_NOT_EXPLOSION 0.5
-#define IFRAMES 1
+#define emoteCooldown 3.5
+#define IFRAMES 3
+#define NUM_EMOTES 11
 
 
 /*typedef int TIPOCHAVE;
@@ -112,7 +114,7 @@ typedef struct
     bomb bombs[MAX_BOMBS];
     char keys;
     double lastDmg;
-
+    float lastEmoteTime;
     int state;
     int Frame_atual;
     double animation_timer;
@@ -441,6 +443,8 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde)
     bomberman->local.direction = DOWN;
     bomberman->local.offsetX = 0;
     bomberman->local.offsetY = 0;
+    bomberman->lastDmg = 0;
+    bomberman->lastEmoteTime = 0;
 
     bomberman->state = 0; //inicia parado
     bomberman->Frame_atual = 0;
@@ -657,7 +661,7 @@ void writeName(char *name)
     }
 }
 
-void saveRecord(player bomberman)
+void saveRecord(player bomberman, Sound recordsound)
 {
     record saving;
     saving.points = bomberman.points;
@@ -671,6 +675,7 @@ void saveRecord(player bomberman)
         {
             puts("ERRO - O record nao pode ser salvo");
         }
+        PlaySound(recordsound);
         while(!IsKeyPressed(KEY_ENTER))
         {
             if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
@@ -707,6 +712,7 @@ void saveRecord(player bomberman)
         if(position != 10)
         {
             fseek(file, position*sizeof(record), SEEK_SET);
+            PlaySound(recordsound);
             while(!IsKeyPressed(KEY_ENTER))
             {
                 if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
@@ -907,16 +913,33 @@ void enemyMove(enemy *zombie, char **world)
     }
 }
 
-void menu(player *bomberman, char **world, char *information, LIST *horde, Music musicmenu, Texture2D capa)
+void menu(player *bomberman, char **world, char *information, LIST *horde, Music musicmenu, Texture2D capa, Sound interacao, Texture2D capamenu)
 {
+    int pressedenter = 0;
+    while (!pressedenter){
+        BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawTexture(capa, 0, 0, WHITE);
+            UpdateMusicStream(musicmenu);
+        EndDrawing();
+            if(IsKeyPressed(KEY_ENTER)) pressedenter = 1;
+    }
+    float cont = GetTime();
+    while(GetTime() - cont < 0.167){
+        BeginDrawing();
+            ClearBackground(RAYWHITE);
+            DrawTexture(capa, 0, 0, WHITE);
+            UpdateMusicStream(musicmenu);
+        EndDrawing();
+    }
     coordinates arrow = {0, 0, 0, 0, 0};
     while(!arrow.direction)
     {
         UpdateMusicStream(musicmenu);
-        if(IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) arrow.y = (arrow.y+2)%3;
-        if(IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) arrow.y = (arrow.y+1)%3;
-        if(IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) arrow.x = (arrow.x+1)%2;
-        if(IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) arrow.x = (arrow.x+1)%2;
+        if(IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)){arrow.y = (arrow.y+2)%3; PlaySound(interacao);}
+        if(IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)){arrow.y = (arrow.y+1)%3; PlaySound(interacao);}
+        if(IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)){arrow.x = (arrow.x+1)%2; PlaySound(interacao);}
+        if(IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)){arrow.x = (arrow.x+1)%2; PlaySound(interacao);}
         if(IsKeyPressed(KEY_ENTER))
         {
             if(arrow.y == 0 && arrow.x == 0)
@@ -944,19 +967,13 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
         if(WindowShouldClose() || IsKeyPressed(KEY_Q)) CloseWindow();
         BeginDrawing();
             ClearBackground(RAYWHITE);
-            DrawTexture(capa, 0, 0, WHITE);
-            DrawText("Novo jogo", 130, 290, 70, GREEN);
-            DrawText("Jogo salvo", 130, 390, 70, GREEN);
-            DrawText("Records", 130, 490, 70, GREEN);
-            DrawText("Controles", 630, 290, 70, GREEN);
-            DrawText("Criadores", 630, 390, 70, GREEN);
-            DrawText("Sair", 630, 490, 70, GREEN);
-            DrawRectangle(70 + (500*arrow.x), (100*arrow.y) + 290, 50, 50, PURPLE);
+            DrawTexture(capamenu, 0, 0, WHITE);
+            DrawRectangle(70 + (500*arrow.x), (100*arrow.y) + 140, 50, 50, PURPLE);
         EndDrawing();
     }
 }
 
-void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu, Texture2D capa)
+void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu, Sound recordsound)
 {
     if(GetTime() - bomberman->lastDmg >= IFRAMES){
         bomberman->lastDmg = GetTime();
@@ -978,8 +995,8 @@ void loseLife(player *bomberman, char *information, char **world, LIST *horde, S
                     DrawText(information, 20, 520, 60, GREEN);
                 EndDrawing();
             }
-            saveRecord(*bomberman);
-            menu(bomberman, world, information, horde, musicmenu, capa);
+            saveRecord(*bomberman, recordsound);
+            menu(bomberman, world, information, horde, musicmenu, capa, intmenu, capamenu);
         }
         else PlaySound(lostlife);
     }
@@ -1010,7 +1027,7 @@ void Explosion_impact(int x, int y, player *bomberman, char *information, char *
     }
 }
 
-void pauseGame(player *bomberman, char *information, char **world, LIST *horde, Music musicmenu, Texture2D capa)
+void pauseGame(player *bomberman, char *information, char **world, LIST *horde, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu)
 {
     while(!IsKeyPressed(KEY_V))
     {
@@ -1024,7 +1041,7 @@ void pauseGame(player *bomberman, char *information, char **world, LIST *horde, 
         }
         if(IsKeyPressed(KEY_M))
         {
-            menu(bomberman, world, information, horde, musicmenu, capa);
+            menu(bomberman, world, information, horde, musicmenu, capa, intmenu, capamenu);
             break;
         }
         if(IsKeyPressed(KEY_S)) saveGame(*bomberman, world, horde);
@@ -1045,10 +1062,33 @@ void pauseGame(player *bomberman, char *information, char **world, LIST *horde, 
     }
 }
 
+void doEmote(
+    Sound s1, Sound s2, Sound s3, Sound s4, Sound s5, Sound s6,
+    Sound s7, Sound s8, Sound s9, Sound s10, Sound s11, player *bomberman
+) {
+    float agora = GetTime();
+
+    if (agora - bomberman->lastEmoteTime >= emoteCooldown) {
+        switch (GetRandomValue(1,NUM_EMOTES)) {
+            case 1: PlaySound(s1); break;
+            case 2: PlaySound(s2); break;
+            case 3: PlaySound(s3); break;
+            case 4: PlaySound(s4); break;
+            case 5: PlaySound(s5); break;
+            case 6: PlaySound(s6); break;
+            case 7: PlaySound(s7); break;
+            case 8: PlaySound(s8); break;
+            case 9: PlaySound(s9); break;
+            case 10: PlaySound(s10); break;
+            case 11: PlaySound(s11);
+        }
+        bomberman->lastEmoteTime = agora;
+    }
+}
+
 int main()
 {
     player bomberman;
-    bomberman.lastDmg = 0;
     LIST horde;
     bootList(&horde);
 
@@ -1086,6 +1126,24 @@ int main()
     Sound lostlifesound = LoadSound("Musicas/SoundFX/LoseLife.ogg");
     Sound obtainedkeysound = LoadSound("Musicas/SoundFX/ObtainedKey.ogg");
     Sound victorysound = LoadSound("Musicas/SoundFX/Vitoria.ogg");
+    Sound alcapao = LoadSound("Musicas/SoundFX/alcapao.ogg");
+    Sound intMenu = LoadSound("Musicas/SoundFX/intMenu.ogg");
+    Sound newRecord = LoadSound("Musicas/SoundFX/newRecord.ogg");
+    Sound pause = LoadSound("Musicas/SoundFX/pause.ogg");
+    Sound unpause = LoadSound("Musicas/SoundFX/unpause.ogg");
+    Sound emote1, emote2, emote3, emote4, emote5, emote6;
+    Sound emote7, emote8, emote9, emote10, emote11;
+    emote1  = LoadSound("Musicas/Emotes/s1.ogg");
+    emote2  = LoadSound("Musicas/Emotes/s2.ogg");
+    emote3  = LoadSound("Musicas/Emotes/s3.ogg");
+    emote4  = LoadSound("Musicas/Emotes/s4.ogg");
+    emote5  = LoadSound("Musicas/Emotes/s5.ogg");
+    emote6  = LoadSound("Musicas/Emotes/s6.ogg");
+    emote7  = LoadSound("Musicas/Emotes/s7.ogg");
+    emote8  = LoadSound("Musicas/Emotes/s8.ogg");
+    emote9  = LoadSound("Musicas/Emotes/s9.ogg");
+    emote10 = LoadSound("Musicas/Emotes/s10.ogg");
+    emote11 = LoadSound("Musicas/Emotes/s11.ogg");
     if (musicmap1.stream.buffer == NULL) {
         puts("ERRO - Nao foi possivel carregar a musica");
         CloseAudioDevice();
@@ -1121,18 +1179,105 @@ int main()
         CloseAudioDevice();
         return -1;
     }
+    if (emote1.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica s1.ogg");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (emote2.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica s2.ogg");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (emote3.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica s3.ogg");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (emote4.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica s4.ogg");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (emote5.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica s5.ogg");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (emote6.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica s6.ogg");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (emote7.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica s7.ogg");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (emote8.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica s8.ogg");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (emote9.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica s9.ogg");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (emote10.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica s10.ogg");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (emote11.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica s11.ogg");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (alcapao.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (intMenu.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (newRecord.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (pause.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica");
+        CloseAudioDevice();
+        return -1;
+    }
+    if (unpause.stream.buffer == NULL) {
+        puts("ERRO - Nao foi possivel carregar a musica");
+        CloseAudioDevice();
+        return -1;
+    }
     musicmenu.looping = true;
     musicmap1.looping = true;
     musicmap2.looping = true;
     PlayMusicStream(musicmenu);
-    Texture2D capa = LoadTexture("Sprites/bomberfelix.jpeg");
+    Texture2D capa = LoadTexture("Sprites/telas/capa.png");
     if(!IsTextureValid(capa))
     {
         puts("ERRO - Nao foi possivel achar o sprite da capa.");
         CloseWindow();
         return 1;    
     }
-    menu(&bomberman, world, information, &horde, musicmenu, capa);
+    Texture2D capamenu = LoadTexture("Sprites/telas/menu.png");
+    if(!IsTextureValid(capamenu))
+    {
+        puts("ERRO - Nao foi possivel achar o sprite da capa do menu.");
+        CloseWindow();
+        return 1;    
+    }
+    menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu);
     PlayMusicStream(musicmap1);
     //código abaixo para carregar as sprites. Extremamente importante esse código estar depois do initwindow
     Texture2D wall_spr = LoadTexture("Sprites/cenario/parede.png");
@@ -1430,11 +1575,18 @@ int main()
         if(IsKeyPressed(KEY_B)) putBomb(&bomberman, world, information);
         if(IsKeyPressed(KEY_TAB)){
             double *times = (double*)malloc(sizeof(double)*MAX_BOMBS);
+            PlaySound(pause);
             for(int i = 0; i < MAX_BOMBS; i++) *(times+i) = TIMER_BOMB - (GetTime() - bomberman.bombs[i].planttime);
-            pauseGame(&bomberman, information, world, &horde, musicmenu, capa);
+            pauseGame(&bomberman, information, world, &horde, musicmenu, capa, intMenu, capamenu);
             for(int i = 0; i < MAX_BOMBS; i++) bomberman.bombs[i].planttime = GetTime() - (TIMER_BOMB - *(times+i));
+            PlaySound(unpause);
             free(times);
         }
+        if (IsKeyPressed(KEY_T))
+        doEmote(
+            emote1, emote2, emote3, emote4, emote5, emote6,
+            emote7, emote8, emote9, emote10, emote11, &bomberman
+        );
         for(int i = 0; i < MAX_BOMBS; i++)
         {
             if(bomberman.bombs[i].active)
@@ -1612,7 +1764,7 @@ int main()
 
                             DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                             Rectangle exphb = {bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                            if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa);
+                            if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord);
                             bool para_cima_desenho = false;
                             bool para_baixo_desenho = false;
                             bool para_esquerda_desenho = false;
@@ -1627,7 +1779,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, WHITE);
                                 Rectangle exphb = {bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) != FREE) para_cima_desenho = true;
                             }
@@ -1641,7 +1793,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, WHITE);
                                 Rectangle exphb = {bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y + j) + bomberman.bombs[i].local.x) != FREE) para_baixo_desenho = true;
                             }
@@ -1655,7 +1807,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                                 Rectangle exphb = {(bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x - j) != FREE) para_esquerda_desenho = true;
                             }
@@ -1669,7 +1821,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                                 Rectangle exphb = {(bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x + j) != FREE) para_direita_desenho = true;
                             }
@@ -1724,7 +1876,7 @@ int main()
                 enemyMove(&alive->zombie, world);
                 DrawTexture(player_walk_rigth[0], alive->zombie.local.x*METERS + alive->zombie.local.offsetX, alive->zombie.local.y*METERS + alive->zombie.local.offsetY, RED);
                 Rectangle enemyhb = {alive->zombie.local.x*METERS + alive->zombie.local.offsetX, alive->zombie.local.y*METERS + alive->zombie.local.offsetY, 16, 16};
-                if(checkHitbox(playerhb, enemyhb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa);
+                if(checkHitbox(playerhb, enemyhb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord);
                 alive = alive->next;
             }
             DrawText(information, 20, 530, 50, GREEN);
@@ -1755,10 +1907,31 @@ int main()
     UnloadTexture(box_spr);
     UnloadTexture(key_spr);
     UnloadTexture(floor_spr);
+    UnloadSound(emote1);
+    UnloadSound(emote2);
+    UnloadSound(emote3);
+    UnloadSound(emote4);
+    UnloadSound(emote5);
+    UnloadSound(emote6);
+    UnloadSound(emote7);
+    UnloadSound(emote8);
+    UnloadSound(emote9);
+    UnloadSound(emote10);
+    UnloadSound(emote11);
+    UnloadSound(losssound);
+    UnloadSound(lostlifesound);
+    UnloadSound(obtainedkeysound);
+    UnloadSound(victorysound);
+    UnloadSound(alcapao);
+    UnloadSound(intMenu);
+    UnloadSound(newRecord);
+    UnloadSound(pause);
+    UnloadSound(unpause);
     UnloadMusicStream(musicmap1);
     UnloadMusicStream(musicmap2);
     UnloadMusicStream(musicmenu);
     CloseAudioDevice();
+    CloseWindow();
     free(information);
     for (int i = 0; i < 3; i++) {
         UnloadTexture(explosion_spr[i]);
@@ -1769,6 +1942,5 @@ int main()
     }
     rebootList(&horde);
     free(world);
-    CloseWindow();
     return 0;
 }
