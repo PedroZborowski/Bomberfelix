@@ -24,6 +24,7 @@ Thiago Barbosa da Silva - 124247625*/
 #define ENEMY 'E'
 #define KEY 'F'
 #define BOMB 'O'
+#define TRAPDOOR 'N'
 #define EXPLODING_WALL 'X'//To tendo que adionar isso aq pq lá em baixo eu preciso checar se a parede foi destruida sem transformar em "vazio" para poder limitar até onde desenhar a merda do sprite da explosão
 
 #define UP 0
@@ -427,10 +428,9 @@ void closeGame()
     }
 }
 
-bool newGame(player *bomberman, char **world, char *information, LIST *horde)
+bool newGame(player *bomberman, char **world, char *information, LIST *horde, coordinates *trapdoor, char *argv[])
 {
-    FILE *file = fopen("world1.txt", "r");
-    //FILE *file = fopen("world2.txt", "r");
+    FILE *file = fopen(argv[1], "r");
     if(!file)
     {
         puts("ERRO - O nivel nao pode ser aberto");
@@ -488,6 +488,12 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde)
             *(*(world + squares.y) + squares.x) = FREE;
             break;
 
+            case TRAPDOOR:
+            trapdoor->x = squares.x;
+            trapdoor->y = squares.y;
+            *(*(world + squares.y) + squares.x) = FREE;
+            break;
+
             default:
             *(*(world + squares.y) + squares.x) = object;
         }
@@ -506,7 +512,88 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde)
     return true;
 }
 
-bool loadGame(player *bomberman, char **world, char *information, LIST *horde)
+bool nextLevel(player *bomberman, char **world, char *information, LIST *horde, coordinates *trapdoor, char *argv[])
+{
+    FILE *file = fopen(argv[2], "r");
+    if(!file)
+    {
+        puts("ERRO - O nivel nao pode ser aberto");
+        return false;
+    }
+
+    
+    bomberman->keys = 0;
+    bomberman->local.direction = DOWN;
+    bomberman->local.offsetX = 0;
+    bomberman->local.offsetY = 0;
+
+    bomberman->state = 0; //inicia parado
+    bomberman->Frame_atual = 0;
+    bomberman->animation_timer = 0.0;
+
+    for(int i = 0; i < MAX_BOMBS; i++){
+        bomberman->bombs[i].active = false;
+        bomberman->bombs[i].radio = 2;
+    }
+
+    enemy zombie;
+    zombie.local.offsetX = 0;
+    zombie.local.offsetY = 0;
+    zombie.walkTimer = 0.0;
+    rebootList(horde);
+
+    coordinates squares; //leitor do arquivo, vai assim: W | E  W
+    squares.x = 0;
+    squares.y = 0;
+    char object = fgetc(file);
+    while(!feof(file))
+    {
+        switch(object)
+        {
+            case '\n':
+            squares.x -= 1;
+            break;
+
+            case PLAYER:
+            bomberman->local.x = squares.x;
+            bomberman->local.y = squares.y;
+            *(*(world + squares.y) + squares.x) = FREE;
+            break;
+
+
+            case ENEMY:
+            zombie.local.x = squares.x;
+            zombie.local.y = squares.y;
+            zombie.local.direction = GetRandomValue(0, 3);
+            insertInList(horde, zombie);
+            *(*(world + squares.y) + squares.x) = FREE;
+            break;
+
+            case TRAPDOOR:
+            trapdoor->x = squares.x;
+            trapdoor->y = squares.y;
+            *(*(world + squares.y) + squares.x) = FREE;
+            break;
+
+            default:
+            *(*(world + squares.y) + squares.x) = object;
+        }
+        squares.x += 1;
+        if(squares.x/WIDTH)
+        {
+            squares.x = 0;
+            squares.y += 1;
+        }
+        object = fgetc(file);
+    }
+    *(information + 8) = '3';
+    *(information + 21) = bomberman->lifes;
+    sprintf(information + 35, "%d", bomberman->points);
+    fclose(file);
+    return true;
+}
+
+bool loadGame(player *bomberman, char **world, char *information, LIST *horde, coordinates *trapdoor)
 {
     FILE *file = fopen("save.dat", "rb");
     if(!file)
@@ -540,6 +627,7 @@ bool loadGame(player *bomberman, char **world, char *information, LIST *horde)
     rebootList(horde);
     enemy zombie;
     fread(&zombie, sizeof(enemy), 1, file);
+    fread(trapdoor, sizeof(coordinates), 1, file);
     while(!feof(file))
     {
         insertInList(horde, zombie);
@@ -559,7 +647,7 @@ bool loadGame(player *bomberman, char **world, char *information, LIST *horde)
     return true;
 }
 
-bool saveGame(player bomberman, char **world, LIST *horde)
+bool saveGame(player bomberman, char **world, LIST *horde, coordinates trapdoor)
 {
     FILE *file = fopen("save.dat", "wb");
     if(!file)
@@ -582,6 +670,7 @@ bool saveGame(player bomberman, char **world, LIST *horde)
     char split = '\n';
     fwrite(&split, sizeof(char), 1, file);
     fwrite(&bomberman, sizeof(player), 1, file);
+    fwrite(&trapdoor, sizeof(coordinates), 1, file);
 
     POINTER_LIST find = horde->start;
     while(find != NULL)
@@ -913,16 +1002,14 @@ void enemyMove(enemy *zombie, char **world)
     }
 }
 
-void menu(player *bomberman, char **world, char *information, LIST *horde, Music musicmenu, Texture2D capa, Sound interacao, Texture2D capamenu)
+void menu(player *bomberman, char **world, char *information, LIST *horde, Music musicmenu, Texture2D capa, Sound interacao, Texture2D capamenu, coordinates *trapdoor, char *argv[])
 {
-    int pressedenter = 0;
-    while (!pressedenter){
+    while (!IsKeyPressed(KEY_ENTER)){
         BeginDrawing();
             ClearBackground(RAYWHITE);
             DrawTexture(capa, 0, 0, WHITE);
             UpdateMusicStream(musicmenu);
         EndDrawing();
-            if(IsKeyPressed(KEY_ENTER)) pressedenter = 1;
     }
     float cont = GetTime();
     while(GetTime() - cont < 0.167){
@@ -944,16 +1031,16 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
         {
             if(arrow.y == 0 && arrow.x == 0)
             {
-                if(newGame(bomberman, world, information, horde)) break;
+                if(newGame(bomberman, world, information, horde, trapdoor, argv)) break;
             }
             if(arrow.y == 1 && arrow.x == 0)
             {
-                if(loadGame(bomberman, world, information, horde)) break;
+                if(loadGame(bomberman, world, information, horde, trapdoor)) break;
                 else
                 {
-                    /*BeginDrawing();
-                        DrawText("Nao ha nenhum jogo salvo", 130, 500, 70, BLACK); inserir mensagem temporaria com pilha? aqui e no pause/gameover screen
-                    EndDrawing();*/
+                    BeginDrawing();
+                        DrawText("Nao ha nenhum jogo salvo", 130, 500, 70, BLACK);
+                    EndDrawing();
                 }
             }
             if(arrow.y == 2 && arrow.x == 0) showRecords(musicmenu);
@@ -973,7 +1060,7 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
     }
 }
 
-void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu, Sound recordsound)
+void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu, Sound recordsound, coordinates *trapdoor, char *argv[])
 {
     if(GetTime() - bomberman->lastDmg >= IFRAMES){
         bomberman->lastDmg = GetTime();
@@ -990,13 +1077,13 @@ void loseLife(player *bomberman, char *information, char **world, LIST *horde, S
                 if(IsKeyPressed(KEY_Q) || WindowShouldClose()) closeGame();
                 BeginDrawing();
                     DrawText("GAME OVER", 130, 220, 150, RED);
-                    DrawText("Precione B para continuar", 100, 320, 80, RED);
+                    DrawText("Pressione B para continuar", 100, 320, 80, RED);
                     DrawRectangle(0, STATURE*METERS, WIDTH*METERS, 5*METERS,RAYWHITE);
                     DrawText(information, 20, 520, 60, GREEN);
                 EndDrawing();
             }
             saveRecord(*bomberman, recordsound);
-            menu(bomberman, world, information, horde, musicmenu, capa, intmenu, capamenu);
+            menu(bomberman, world, information, horde, musicmenu, capa, intmenu, capamenu, trapdoor, argv);
         }
         else PlaySound(lostlife);
     }
@@ -1027,24 +1114,24 @@ void Explosion_impact(int x, int y, player *bomberman, char *information, char *
     }
 }
 
-void pauseGame(player *bomberman, char *information, char **world, LIST *horde, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu)
+void pauseGame(player *bomberman, char *information, char **world, LIST *horde, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu, coordinates *trapdoor, char *argv[])
 {
     while(!IsKeyPressed(KEY_V))
     {
         if(IsKeyPressed(KEY_N))
         {
-            if(newGame(bomberman, world, information, horde)) break;
+            if(newGame(bomberman, world, information, horde, trapdoor, argv)) break;
         }
         if(IsKeyPressed(KEY_C))
         {
-            if(loadGame(bomberman, world, information, horde)) break;
+            if(loadGame(bomberman, world, information, horde, trapdoor)) break;
         }
         if(IsKeyPressed(KEY_M))
         {
-            menu(bomberman, world, information, horde, musicmenu, capa, intmenu, capamenu);
+            menu(bomberman, world, information, horde, musicmenu, capa, intmenu, capamenu, trapdoor, argv);
             break;
         }
-        if(IsKeyPressed(KEY_S)) saveGame(*bomberman, world, horde);
+        if(IsKeyPressed(KEY_S)) saveGame(*bomberman, world, horde, *trapdoor);
         if(IsKeyPressed(KEY_R))
         {
             showRecords(musicmenu);
@@ -1086,8 +1173,38 @@ void doEmote(
     }
 }
 
+char teste()
+{
+    char argc = '0';
+    char *argv = (char *)malloc(13*sizeof(char));
+    if(!argv)
+    {
+        puts("ERRO");
+        return '-';
+    }
+    strcpy(argv, "world0.txt");
+    while(!argc)
+    {
+        *(argv+5) = argc+1;
+        FILE *file = fopen(argv, "r");
+        if(!file)
+        {
+            fclose(file);
+            return argc;
+        }
+        else
+        {
+            fclose(file);
+            argc++;
+        }
+    }
+}
+
 int main()
 {
+    char argc  = teste();
+    char *argv[] = ()malloc(sizeof());
+    coordinates trapdoor;
     player bomberman;
     LIST horde;
     bootList(&horde);
@@ -1277,7 +1394,7 @@ int main()
         CloseWindow();
         return 1;    
     }
-    menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu);
+    menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv);
     PlayMusicStream(musicmap1);
     //código abaixo para carregar as sprites. Extremamente importante esse código estar depois do initwindow
     Texture2D wall_spr = LoadTexture("Sprites/cenario/parede.png");
@@ -1288,6 +1405,8 @@ int main()
     Texture2D floor_spr = LoadTexture("Sprites/cenario/chao.png");
     Texture2D in = LoadTexture("Sprites/cenario/in.png");
     Texture2D bomb_animation[2];
+    Texture2D alcapaofechado = LoadTexture("Sprites/cenario/alcapaofechado.png");
+    Texture2D alcapaoaberto = LoadTexture("Sprites/cenario/alcapaoaberto.png");
     bomb_animation[0] = LoadTexture("Sprites/timing/bomb_black.png");
     bomb_animation[1] = LoadTexture("Sprites/timing/bomb_red.png");
 
@@ -1331,6 +1450,16 @@ int main()
 
 
     //segundo o site oficial, checa se a textura e valida e esta carregada na GPU, retorna TRUE 
+    if (!IsTextureValid(alcapaofechado)) {
+        puts("ERRO - Nao foi possivel achar o sprite do alcapao fechado");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(alcapaoaberto)) {
+        puts("ERRO - Nao foi possivel achar o sprite do alcapao aberto");
+        CloseWindow();
+        return 1;
+    }
     if(!IsTextureValid(bomb_animation[0])){
         puts("ERRO - Nao foi possivel achar o sprite 1 da bomba.");
         CloseWindow();
@@ -1577,11 +1706,12 @@ int main()
             double *times = (double*)malloc(sizeof(double)*MAX_BOMBS);
             PlaySound(pause);
             for(int i = 0; i < MAX_BOMBS; i++) *(times+i) = TIMER_BOMB - (GetTime() - bomberman.bombs[i].planttime);
-            pauseGame(&bomberman, information, world, &horde, musicmenu, capa, intMenu, capamenu);
+            pauseGame(&bomberman, information, world, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv);
             for(int i = 0; i < MAX_BOMBS; i++) bomberman.bombs[i].planttime = GetTime() - (TIMER_BOMB - *(times+i));
             PlaySound(unpause);
             free(times);
         }
+        if(IsKeyPressed(KEY_I)) bomberman.keys++;
         if (IsKeyPressed(KEY_T))
         doEmote(
             emote1, emote2, emote3, emote4, emote5, emote6,
@@ -1700,7 +1830,7 @@ int main()
             //primeiro eu crio um triangulo do sizeList da tela
             Rectangle sourceRec = {0.0, 0.0, WIDTH*METERS, 500}; // o motivo de ser 500 e não HEIGHT e pq ali em baixo fica a hud ne, se quiser entender melhor troca isso para "HEIGHT"
             //esse código desenha o sprite no retangulo criado. Como o sprite(tam: 20x20) é bem menor que o retangulo (tam: tela), ele vai preenchendo até cobrir tudo
-            Rectangle playerhb = {bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, 16, 16};
+            Rectangle playerhb = {bomberman.local.x*METERS + bomberman.local.offsetX+2, bomberman.local.y*METERS + bomberman.local.offsetY+2, 16, 16};
             DrawTextureRec(floor_spr, sourceRec, origin, WHITE);
             for(int y = 0; y < STATURE; y++)
             {
@@ -1745,7 +1875,12 @@ int main()
                     }
                 }
             }
-
+            if(bomberman.keys > 4)
+            {
+                DrawTexture(alcapaoaberto, trapdoor.x*METERS, trapdoor.y*METERS, WHITE);
+                if(bomberman.local.x == trapdoor.x && bomberman.local.y == trapdoor.y) nextLevel(&bomberman, world, information, &horde, &trapdoor, argv);
+            }
+            else DrawTexture(alcapaofechado, trapdoor.x*METERS, trapdoor.y*METERS, WHITE);
             for(int i = 0; i< MAX_BOMBS; i++){
                 if(bomberman.bombs[i].active){//se ta ativa
                     if(!bomberman.bombs[i].Exploding){//se ta plantada
@@ -1764,7 +1899,7 @@ int main()
 
                             DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                             Rectangle exphb = {bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                            if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord);
+                            if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv);
                             bool para_cima_desenho = false;
                             bool para_baixo_desenho = false;
                             bool para_esquerda_desenho = false;
@@ -1779,7 +1914,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, WHITE);
                                 Rectangle exphb = {bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) != FREE) para_cima_desenho = true;
                             }
@@ -1793,7 +1928,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, WHITE);
                                 Rectangle exphb = {bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y + j) + bomberman.bombs[i].local.x) != FREE) para_baixo_desenho = true;
                             }
@@ -1807,7 +1942,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                                 Rectangle exphb = {(bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x - j) != FREE) para_esquerda_desenho = true;
                             }
@@ -1821,7 +1956,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                                 Rectangle exphb = {(bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x + j) != FREE) para_direita_desenho = true;
                             }
@@ -1837,49 +1972,49 @@ int main()
             {
                 case UP:
                 if(bomberman.state == 1){
-                DrawTexture(player_walk_up[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                DrawTexture(player_walk_up[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX+2, bomberman.local.y*METERS + bomberman.local.offsetY+2, WHITE);
                 }
                 else{
-                    DrawTexture(player_idle_up[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                    DrawTexture(player_idle_up[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX+2, bomberman.local.y*METERS + bomberman.local.offsetY+2, WHITE);
                 }
                 break;
 
                 case RIGHT:
                 if(bomberman.state == 1){
-                DrawTexture(player_walk_rigth[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                DrawTexture(player_walk_rigth[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX+2, bomberman.local.y*METERS + bomberman.local.offsetY+2, WHITE);
                 }
                 else{
-                    DrawTexture(player_idle_right[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                    DrawTexture(player_idle_right[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX+2, bomberman.local.y*METERS + bomberman.local.offsetY+2, WHITE);
                 }
                 break;
 
                 case DOWN:
                 if(bomberman.state == 1){
-                DrawTexture(player_walk_down[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                DrawTexture(player_walk_down[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX+2, bomberman.local.y*METERS + bomberman.local.offsetY+2, WHITE);
                 }
                 else{
-                    DrawTexture(player_idle_down[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                    DrawTexture(player_idle_down[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX+2, bomberman.local.y*METERS + bomberman.local.offsetY+2, WHITE);
                 }
                 break;
 
                 case LEFT:
                 if(bomberman.state == 1){
-                DrawTexture(player_walk_left[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                DrawTexture(player_walk_left[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX+2, bomberman.local.y*METERS + bomberman.local.offsetY+2, WHITE);
                 }
                 else{
-                     DrawTexture(player_idle_left[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX, bomberman.local.y*METERS + bomberman.local.offsetY, WHITE);
+                     DrawTexture(player_idle_left[bomberman.Frame_atual], bomberman.local.x*METERS + bomberman.local.offsetX+2, bomberman.local.y*METERS + bomberman.local.offsetY+2, WHITE);
                 }
             }
             POINTER_LIST alive = horde.start;
             while(alive != NULL)
             {
                 enemyMove(&alive->zombie, world);
-                DrawTexture(player_walk_rigth[0], alive->zombie.local.x*METERS + alive->zombie.local.offsetX, alive->zombie.local.y*METERS + alive->zombie.local.offsetY, RED);
-                Rectangle enemyhb = {alive->zombie.local.x*METERS + alive->zombie.local.offsetX, alive->zombie.local.y*METERS + alive->zombie.local.offsetY, 16, 16};
-                if(checkHitbox(playerhb, enemyhb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord);
+                DrawTexture(player_walk_rigth[0], alive->zombie.local.x*METERS + alive->zombie.local.offsetX + 2, alive->zombie.local.y*METERS + alive->zombie.local.offsetY + 2, RED);
+                Rectangle enemyhb = {alive->zombie.local.x*METERS + alive->zombie.local.offsetX + 2, alive->zombie.local.y*METERS + alive->zombie.local.offsetY + 2, 16, 16};
+                if(checkHitbox(playerhb, enemyhb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv);
                 alive = alive->next;
             }
-            DrawText(information, 20, 530, 50, GREEN);
+            DrawText(information, 20, 530, 50, BLACK);
             DrawText(TextFormat("%.1lf", GetTime()), 1140, 580, 20, BLACK);
             for(int i = 0; i < bomberman.keys; i++){
                 DrawTexture(whitekey_spr, 1000+i*35, 540, WHITE);
