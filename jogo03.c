@@ -452,9 +452,9 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde, co
         bomberman->bombs[i].radio = 2;
     }
 
-    trapdoor.offsetX = 0;
-    trapdoor.offsetY = 0;
-    trapdoor.direction = DOWN;
+    trapdoor->offsetX = 0;
+    trapdoor->offsetY = 0;
+    trapdoor->direction = DOWN;
 
     enemy zombie;
     zombie.local.offsetX = 0;
@@ -1169,7 +1169,6 @@ bool nextLevel(player *bomberman, char **world, char *information, LIST *horde, 
             *(*(world + squares.y) + squares.x) = FREE;
             break;
 
-
             case ENEMY:
             zombie.local.x = squares.x;
             zombie.local.y = squares.y;
@@ -1466,7 +1465,6 @@ int main()
     Texture2D box_spr = LoadTexture("Sprites/cenario/caixa.png");
     Texture2D explosible_spr = LoadTexture("Sprites/cenario/parede_destrutivel.png");
     Texture2D key_spr = LoadTexture("Sprites/interagiveis/chave.png");
-    Texture2D whitekey_spr = LoadTexture("Sprites/interagiveis/chavewhite.png");
     Texture2D floor_spr = LoadTexture("Sprites/cenario/chao.png");
     Texture2D in = LoadTexture("Sprites/cenario/in.png");
     Texture2D bomb_animation[2];
@@ -1723,11 +1721,6 @@ int main()
         puts("ERRO - Nao foi possivel achar o sprite da chave.");
         CloseWindow();
         return 1;    
-    }
-    if(!IsTextureValid(whitekey_spr)){
-        puts("Erro - Nao foi possivel achar o sprite da chave com fundo branco.");
-        CloseWindow();
-        return 1;
     }
     if(!IsTextureValid(floor_spr))
     {
@@ -2176,7 +2169,7 @@ int main()
             DrawText(information, 20, 530, 50, BLACK);
             DrawText(TextFormat("%.1lf", GetTime()), 1140, 580, 20, BLACK);
             for(int i = 0; i < bomberman.keys; i++){
-                DrawTexture(whitekey_spr, 1000+i*35, 540, WHITE);
+                DrawTexture(key_spr, 1000+i*35, 540, WHITE);
             }
         EndDrawing();
     }
