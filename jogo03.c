@@ -25,7 +25,7 @@ Thiago Barbosa da Silva - 124247625*/
 #define KEY 'F'
 #define BOMB 'O'
 #define TRAPDOOR 'N'
-#define EXPLODING_WALL 'X'//To tendo que adionar isso aq pq lá em baixo eu preciso checar se a parede foi destruida sem transformar em "vazio" para poder limitar até onde desenhar a merda do sprite da explosão
+#define EXPLODING_WALL 'X'
 
 #define UP 0
 #define RIGHT 1
@@ -44,29 +44,7 @@ Thiago Barbosa da Silva - 124247625*/
 #define IFRAMES 3
 #define NUM_EMOTES 11
 
-
-/*typedef int TIPOCHAVE;
-
-typedef struct
-{
-    TIPOCHAVE chave;
-} REGISTRO;
-
-typedef struct aux
-{
-    REGISTRO reg;
-    struct aux* next;
-} ELEMENT_QUEUE;
-
-typedef ELEMENT_QUEUE* POINTER_QUEUE;
-
-typedef struct
-{
-    POINTER_QUEUE start;
-    POINTER_QUEUE end;
-} QUEUE;*/
-
-
+//Coordenadas de um objeto qualquer
 typedef struct
 {
     int x;
@@ -84,6 +62,7 @@ typedef struct
     double animation_timer_enemy; //para animação
 } enemy;
 
+//Lista encadeada de inimigos que sao zumbis, chamaremos de horda
 typedef struct aux
 {
     enemy zombie;
@@ -117,6 +96,7 @@ typedef struct
     int points;
     bomb bombs[MAX_BOMBS];
     char keys;
+    int level;
     double lastDmg;
     double lastEmoteTime;
     int state;
@@ -132,11 +112,13 @@ typedef struct
     int points;
 } record;
 
+//Inicializa a lista encadeada de zumbis
 void bootList(LIST* horde)
 {
     horde->start = NULL;
 }
 
+//Verifica o tamanho da horda
 int sizeList(LIST* horde)
 {
     POINTER_LIST find = horde->start;
@@ -149,6 +131,7 @@ int sizeList(LIST* horde)
     return size;
 }
 
+//Insere um zumbi na horda
 void insertInList(LIST* horde, enemy zombie)
 {
     POINTER_LIST new = (POINTER_LIST)malloc(sizeof(ELEMENT_LIST));
@@ -173,6 +156,7 @@ void insertInList(LIST* horde, enemy zombie)
     }
 }
 
+//Remove um zumbi da horda
 void takeFromList(LIST* horde, int number)
 {
     POINTER_LIST find;
@@ -192,6 +176,7 @@ void takeFromList(LIST* horde, int number)
     free(erase);
 }
 
+//Reinicializa a lista encadeada de zumbis
 void rebootList(LIST* horde)
 {
     POINTER_LIST find = horde->start;
@@ -204,10 +189,12 @@ void rebootList(LIST* horde)
     horde->start = NULL;
 }
 
+//Verifica se dois objetos colidem
 bool checkHitbox(Rectangle plrhb, Rectangle otherhb){
     return CheckCollisionRecs(plrhb, otherhb);
 }
 
+//Movimenta o objeto para cima
 bool walkUp(coordinates *local, char **world)
 {
     if(local->offsetY > -2)
@@ -261,6 +248,7 @@ bool walkUp(coordinates *local, char **world)
     return false;
 }
 
+//Movimenta o objeto para a direita
 bool walkRight(coordinates *local, char **world)
 {
     if(local->offsetX < 2)
@@ -314,6 +302,7 @@ bool walkRight(coordinates *local, char **world)
     return false;
 }
 
+//Movimenta o objeto para baixo
 bool walkDown(coordinates *local, char **world)
 {
     if(local->offsetY < 2)
@@ -367,6 +356,7 @@ bool walkDown(coordinates *local, char **world)
     return false;
 }
 
+//Movimenta o objeto para a esquerda
 bool walkLeft(coordinates *local, char **world)
 {
     if(local->offsetX > -2)
@@ -420,6 +410,7 @@ bool walkLeft(coordinates *local, char **world)
     return false;
 }
 
+//Fecha o jogo
 void closeGame()
 {
     while(!IsKeyPressed(KEY_N))
@@ -433,6 +424,7 @@ void closeGame()
     }
 }
 
+//Le o arquivo do nivel 1 gerando o mesmo, reseta todas as outras variaveis
 bool newGame(player *bomberman, char **world, char *information, LIST *horde, coordinates *trapdoor, char *argv[])
 {
     FILE *file = fopen(argv[0], "r");
@@ -444,6 +436,7 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde, co
     bomberman->lifes = '3';
     bomberman->points = 0;
     bomberman->keys = 0;
+    bomberman->level = 1;
     bomberman->local.direction = DOWN;
     bomberman->local.offsetX = 0;
     bomberman->local.offsetY = 0;
@@ -454,11 +447,14 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde, co
     bomberman->animation_timer = GetTime();
     bomberman->invinciblestate = 1;
     bomberman->invincibletimer = GetTime();
-
     for(int i = 0; i < MAX_BOMBS; i++){
         bomberman->bombs[i].active = false;
         bomberman->bombs[i].radio = 2;
     }
+
+    trapdoor.offsetX = 0;
+    trapdoor.offsetY = 0;
+    trapdoor.direction = DOWN;
 
     enemy zombie;
     zombie.local.offsetX = 0;
@@ -468,7 +464,7 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde, co
     zombie.frame_atual_walk = 0;
     rebootList(horde);
 
-    coordinates squares; //leitor do arquivo, vai assim: W | E  W
+    coordinates squares; //leitor do arquivo
     squares.x = 0;
     squares.y = 0;
     char object = fgetc(file);
@@ -519,140 +515,7 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde, co
     return true;
 }
 
-bool nextLevel(player *bomberman, char **world, char *information, LIST *horde, coordinates *trapdoor, char *argv[])
-{
-    FILE *file = fopen(argv[2], "r");
-    if(!file)
-    {
-        puts("ERRO - O nivel nao pode ser aberto");
-        return false;
-    }
-    
-    bomberman->keys = 0;
-    bomberman->local.direction = DOWN;
-    bomberman->local.offsetX = 0;
-    bomberman->local.offsetY = 0;
-
-    bomberman->state = 0; //inicia parado
-    bomberman->Frame_atual = 0;
-    bomberman->animation_timer = 0.0;
-
-    for(int i = 0; i < MAX_BOMBS; i++){
-        bomberman->bombs[i].active = false;
-        bomberman->bombs[i].radio = 2;
-    }
-
-    enemy zombie;
-    zombie.local.offsetX = 0;
-    zombie.local.offsetY = 0;
-    zombie.walkTimer = 0.0;
-    rebootList(horde);
-
-    coordinates squares; //leitor do arquivo, vai assim: W | E  W
-    squares.x = 0;
-    squares.y = 0;
-    char object = fgetc(file);
-    while(!feof(file))
-    {
-        switch(object)
-        {
-            case '\n':
-            squares.x -= 1;
-            break;
-
-            case PLAYER:
-            bomberman->local.x = squares.x;
-            bomberman->local.y = squares.y;
-            *(*(world + squares.y) + squares.x) = FREE;
-            break;
-
-
-            case ENEMY:
-            zombie.local.x = squares.x;
-            zombie.local.y = squares.y;
-            zombie.local.direction = GetRandomValue(0, 3);
-            insertInList(horde, zombie);
-            *(*(world + squares.y) + squares.x) = FREE;
-            break;
-
-            case TRAPDOOR:
-            trapdoor->x = squares.x;
-            trapdoor->y = squares.y;
-            *(*(world + squares.y) + squares.x) = FREE;
-            break;
-
-            default:
-            *(*(world + squares.y) + squares.x) = object;
-        }
-        squares.x += 1;
-        if(squares.x/WIDTH)
-        {
-            squares.x = 0;
-            squares.y += 1;
-        }
-        object = fgetc(file);
-    }
-    *(information + 8) = '3';
-    *(information + 21) = bomberman->lifes;
-    sprintf(information + 35, "%d", bomberman->points);
-    fclose(file);
-    return true;
-}
-
-bool loadGame(player *bomberman, char **world, char *information, LIST *horde, coordinates *trapdoor)
-{
-    FILE *file = fopen("save.dat", "rb");
-    if(!file)
-    {
-        puts("Nao ha nenhum jogo salvo");
-        return false;
-    }
-    else
-    {
-        puts("Jogo carregado com sucesso");
-    }
-
-    coordinates squares;
-    squares.x = 0;
-    squares.y = 0;
-    char object;
-    fread(&object, sizeof(char), 1, file);
-    while(object != '\n')
-    {
-        *(*(world + squares.y) + squares.x) = object;
-        squares.x += 1;
-        if(squares.x/WIDTH)
-        {
-            squares.x = 0;
-            squares.y += 1;
-        }
-        fread(&object, sizeof(char), 1, file);
-    }
-    fread(bomberman, sizeof(player), 1, file);
-
-    rebootList(horde);
-    enemy zombie;
-    fread(&zombie, sizeof(enemy), 1, file);
-    fread(trapdoor, sizeof(coordinates), 1, file);
-    while(!feof(file))
-    {
-        insertInList(horde, zombie);
-        fread(&zombie, sizeof(enemy), 1, file);
-    }
-
-    char active_bombs = '0';
-    for(int i = 0; i < MAX_BOMBS; i++)
-    {
-        if(!bomberman->bombs[i].active) active_bombs++;
-    }
-    *(information + 8) = active_bombs;
-    *(information + 21) = bomberman->lifes;
-    sprintf(information + 35, "%d", bomberman->points);
-
-    fclose(file);
-    return true;
-}
-
+//Salva as informacoes atuais do jogo em um arquivo binario
 bool saveGame(player bomberman, char **world, LIST *horde, coordinates trapdoor)
 {
     FILE *file = fopen("save.dat", "wb");
@@ -689,6 +552,61 @@ bool saveGame(player bomberman, char **world, LIST *horde, coordinates trapdoor)
     return true;
 }
 
+//Carrega as informacoes salvas anteriormente em um arquivo binario
+bool loadGame(player *bomberman, char **world, char *information, LIST *horde, coordinates *trapdoor)
+{
+    FILE *file = fopen("save.dat", "rb");
+    if(!file)
+    {
+        puts("Nao ha nenhum jogo salvo");
+        return false;
+    }
+    else
+    {
+        puts("Jogo carregado com sucesso");
+    }
+
+    coordinates squares;
+    squares.x = 0;
+    squares.y = 0;
+    char object;
+    fread(&object, sizeof(char), 1, file);
+    while(object != '\n')
+    {
+        *(*(world + squares.y) + squares.x) = object;
+        squares.x += 1;
+        if(squares.x/WIDTH)
+        {
+            squares.x = 0;
+            squares.y += 1;
+        }
+        fread(&object, sizeof(char), 1, file);
+    }
+    fread(bomberman, sizeof(player), 1, file);
+    fread(trapdoor, sizeof(coordinates), 1, file);
+    rebootList(horde);
+    enemy zombie;
+    fread(&zombie, sizeof(enemy), 1, file);
+    while(!feof(file))
+    {
+        insertInList(horde, zombie);
+        fread(&zombie, sizeof(enemy), 1, file);
+    }
+
+    char active_bombs = '0';
+    for(int i = 0; i < MAX_BOMBS; i++)
+    {
+        if(!bomberman->bombs[i].active) active_bombs++;
+    }
+    *(information + 8) = active_bombs;
+    *(information + 21) = bomberman->lifes;
+    sprintf(information + 35, "%d", bomberman->points);
+
+    fclose(file);
+    return true;
+}
+
+//Recebe do usuario um nome de ate 10 digitos exibindo na tela o mesmo enquanto é escrito
 void writeName(char *name)
 {
     int letter = 0;
@@ -756,6 +674,8 @@ void writeName(char *name)
     }
 }
 
+//Verifica se a pontuacao do usuario devera entrar nos records
+//Caso deva salva o record em um arquivo binario
 void saveRecord(player bomberman, Sound recordsound)
 {
     record saving;
@@ -830,6 +750,7 @@ void saveRecord(player bomberman, Sound recordsound)
     fclose(file);
 }
 
+//Le o arquivo binario records para exibir as informações armazenadas
 void showRecords(Music musicmenu, Texture2D telarecordes)
 {
     FILE *file = fopen("record.dat", "rb");
@@ -883,6 +804,7 @@ void showRecords(Music musicmenu, Texture2D telarecordes)
     fclose(file);
 }
 
+//Mostra ao usuario os controles
 void showControls(Music musicmenu, Texture2D telacontroles)
 {
     while(!IsKeyPressed(KEY_V))
@@ -896,6 +818,7 @@ void showControls(Music musicmenu, Texture2D telacontroles)
     }
 }
 
+//Mostra ao usuario os desenvolvedores
 void showDevs(Music musicmenu, Texture2D telacriadores)
 {
     while(!IsKeyPressed(KEY_V))
@@ -909,6 +832,7 @@ void showDevs(Music musicmenu, Texture2D telacriadores)
     }
 }
 
+//Coloca a bomba
 void putBomb(player *bomberman, char **world, char *information)
 {
     for(int i = 0; i < MAX_BOMBS; i++)
@@ -936,7 +860,7 @@ void putBomb(player *bomberman, char **world, char *information)
             bomberman->bombs[i].local.x = bomberman->local.x + 1;
             }
             if(*(*(world + bomberman->bombs[i].local.y) + bomberman->bombs[i].local.x) == FREE){
-            *(*(world + bomberman->bombs[i].local.y) + bomberman->bombs[i].local.x) = BOMB; //aritmética de ponteiros, estou acessando a linha *(world + bombY) e logo em seguida indo para a coluna certa *(world + bombY) + bombX depois disso eu só desreferebcui
+            *(*(world + bomberman->bombs[i].local.y) + bomberman->bombs[i].local.x) = BOMB;
 
             bomberman->bombs[i].planttime = GetTime();
             bomberman->bombs[i].active = true;
@@ -951,6 +875,7 @@ void putBomb(player *bomberman, char **world, char *information)
     }
 }
 
+//Movimenta o inimigo pseudo aleatoriamente
 void enemyMove(enemy *zombie, char **world)
 {
     bool arrived = false;
@@ -979,6 +904,7 @@ void enemyMove(enemy *zombie, char **world)
     }
 }
 
+//Exibe o menu permitindo que o usuario selecione o que fazer
 void menu(player *bomberman, char **world, char *information, LIST *horde, Music musicmenu, Texture2D capa, Sound interacao, Texture2D capamenu, coordinates *trapdoor, char *argv[], Texture2D bombmenu, Texture2D telarecordes, Texture2D telacontroles, Texture2D telacriadores)
 {
     while (!IsKeyPressed(KEY_ENTER)){
@@ -1037,6 +963,7 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
     }
 }
 
+//Mostra ao usuario a tela de derrota
 void gameOver(Texture2D gameoverimg){
     while (!IsKeyPressed(KEY_ENTER)){
         BeginDrawing();
@@ -1053,6 +980,7 @@ void gameOver(Texture2D gameoverimg){
     }
 }
 
+//Diminui a vida do jogador
 void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu, Sound recordsound, coordinates *trapdoor, char *argv[], Texture2D bombmenu, Texture2D telarecordes, Texture2D telacontroles, Texture2D telacriadores, Texture2D gameoverimg)
 {
     if(GetTime() - bomberman->lastDmg >= IFRAMES){
@@ -1075,8 +1003,8 @@ void loseLife(player *bomberman, char *information, char **world, LIST *horde, S
     }
 }
 
+//Gera os efeitos da bomba naquilo que atingir
 void Explosion_impact(int x, int y, player *bomberman, char *information, char **world, LIST *horde){
-    //bem simples também, apenas passo pelo número de inimigos ativo e desativo eles. Aproveito e aumento os points dele, para facilitar o trabalho do Henzel (minha vez de roubar trampo muahahahahhahah)
     POINTER_LIST find = horde->start;
     for(int number = 0; find != NULL; number++){
         if(find->zombie.local.x == x && find->zombie.local.y == y){
@@ -1100,6 +1028,7 @@ void Explosion_impact(int x, int y, player *bomberman, char *information, char *
     }
 }
 
+//Pausa o jogo permitindo que o usuario selecione o que fazer
 void pauseGame(player *bomberman, char *information, char **world, LIST *horde, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu, coordinates *trapdoor, char *argv[], Texture2D bombmenu, Texture2D telarecordes, Texture2D telacontroles, Texture2D telacriadores, Texture2D pauseicon)
 {
     while(!IsKeyPressed(KEY_V))
@@ -1135,6 +1064,7 @@ void pauseGame(player *bomberman, char *information, char **world, LIST *horde, 
     }
 }
 
+//Faz o Felix soltar uma frase de efeito
 void doEmote(
     Sound s1, Sound s2, Sound s3, Sound s4, Sound s5, Sound s6,
     Sound s7, Sound s8, Sound s9, Sound s10, Sound s11, player *bomberman
@@ -1159,21 +1089,22 @@ void doEmote(
     }
 }
 
+//Conta o numero de niveis nos arquivos do jogo
 int countlevels()
 {
     char argc = '0';
     int levels = 0;
-    char argv = (char)malloc(13*sizeof(char));
+    char *argv = (char *)malloc(13*sizeof(char));
     if(!argv)
     {
-        puts("ERRO");
+        puts("ERRO - a memoria nao pode ser alocada");
         return -1;
     }
     strcpy(argv, "world0.txt");
     while(argc != ':')
     {
-        (argv+5) = argc+1;
-        FILEfile = fopen(argv, "r");
+        *(argv+5) = argc+1;
+        FILE *file = fopen(argv, "r");
         if(!file)
         {
             free(argv);
@@ -1188,22 +1119,22 @@ int countlevels()
     return -1;
 }
 
+//Move o jogador para a proxima fase
 bool nextLevel(player *bomberman, char **world, char *information, LIST *horde, coordinates *trapdoor, char *argv)
 {
     FILE *file = fopen(argv, "r");
     if(!file)
     {
-        puts("VOCE VENCEU");
+        puts("ERRO");
         return false;
     }
-
     bomberman->keys = 0;
     bomberman->local.direction = DOWN;
     bomberman->local.offsetX = 0;
     bomberman->local.offsetY = 0;
     bomberman->lastDmg = -10;
     bomberman->lastEmoteTime = GetTime();
-    bomberman->state = 0; //inicia parado
+    bomberman->state = 0;
     bomberman->Frame_atual = 0;
     bomberman->animation_timer = GetTime();
     bomberman->invinciblestate = 1;
@@ -1273,32 +1204,39 @@ bool nextLevel(player *bomberman, char **world, char *information, LIST *horde, 
 
 int main()
 {
+    //Aloca memoria para o nome dos niveis depois de contar quantos sao
     int levels = countlevels();
-    char argv = (char )malloc(levels*sizeof(char));
+    if(levels == -1) return -1;
+    if(!levels)
+    {
+        puts("ERRO - nenhum nivel foi encontrado");
+        return 1;
+    }
+    char **argv = (char **)malloc(levels*sizeof(char*));
     if(!argv)
     {
-        puts("ERRO");
+        puts("ERRO - a memoria nao pode ser alocada");
         return -1;
     }
     char temp = '1';
     for(int i = 0; i < levels; i++)
     {
-        argv[i] = (char )malloc(13*sizeof(char));
+        argv[i] = (char *)malloc(13*sizeof(char));
         if(!argv[i])
         {
-            puts("ERRO");
+            puts("ERRO - a memoria nao pode ser alocada");
             return -1;
         }
         strcpy(argv[i], "world0.txt");
         *(argv[i]+5) = temp;
         temp++;
     }
-    int level = 1;
+
+    //Cria as variaveis fundamentais do jogo, alocando memoria quando necessario
     coordinates trapdoor;
     player bomberman;
     LIST horde;
     bootList(&horde);
-
     char *information = (char *)malloc(50*sizeof(char));
     if(!information)
     {
@@ -1306,7 +1244,6 @@ int main()
         return -1;
     }
     strcpy(information, "Bombas: X     Vidas: X     Pontos: X");
-
     char **world = (char **)malloc(STATURE*sizeof(char *));
     if(!world)
     {
@@ -1325,6 +1262,8 @@ int main()
 
     InitWindow(WIDTH*METERS, HEIGHT*METERS, "BomberFelix");
     SetTargetFPS(60);
+
+    //Carrega os audios e retorna erro caso nao consiga
     InitAudioDevice();
     Music musicmap1 = LoadMusicStream("Musicas/Songs/Mapa1.ogg");
     Music musicmap2 = LoadMusicStream("Musicas/Songs/Mapa2.ogg");
@@ -1476,6 +1415,8 @@ int main()
     musicmap1.looping = true;
     musicmap2.looping = true;
     PlayMusicStream(musicmenu);
+
+    //Carrega os sprites e telas do menu retornando erro caso nao consiga
     Texture2D capa = LoadTexture("Sprites/telas/capa.png");
     if(!IsTextureValid(capa))
     {
@@ -1519,7 +1460,8 @@ int main()
     }
     menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores);
     PlayMusicStream(musicmap1);
-    //código abaixo para carregar as sprites. Extremamente importante esse código estar depois do initwindow
+
+    //Carrega os sprites e telas do jogo retornando erro caso nao consiga
     Texture2D wall_spr = LoadTexture("Sprites/cenario/parede.png");
     Texture2D box_spr = LoadTexture("Sprites/cenario/caixa.png");
     Texture2D explosible_spr = LoadTexture("Sprites/cenario/parede_destrutivel.png");
@@ -1534,8 +1476,6 @@ int main()
     Texture2D gameoverimg = LoadTexture("Sprites/telas/gameover.png");
     bomb_animation[0] = LoadTexture("Sprites/timing/bomb_black.png");
     bomb_animation[1] = LoadTexture("Sprites/timing/bomb_red.png");
-
-
     Texture2D explosion_spr[3];
     explosion_spr[0] = LoadTexture("Sprites/explosao/explosao1.png");
     explosion_spr[1] = LoadTexture("Sprites/explosao/explosao2.png");
@@ -1592,9 +1532,6 @@ int main()
     zombie_walk_rigth[1] = LoadTexture("Sprites/inimigo/Zombie-walk-right2.png");
     zombie_walk_rigth[2] = LoadTexture("Sprites/inimigo/Zombie-walk-right3.png");
     zombie_walk_rigth[3] = LoadTexture("Sprites/inimigo/Zombie-walk-right4.png");
-
-
-    //segundo o site oficial, checa se a textura e valida e esta carregada na GPU, retorna TRUE
     if (!IsTextureValid(in)) {
         puts("ERRO - Nao foi possivel achar o sprite da porta");
         CloseWindow();
@@ -1799,7 +1736,6 @@ int main()
         return 1;    
     }
 
-    //posição inicial
     Vector2 origin = {0.0, 0.0};
     while(!WindowShouldClose())
     {
@@ -1832,7 +1768,7 @@ int main()
             }
         }
         if(tamovendo == true){
-            if(bomberman.state != 1){ //to usando 0 para parado e 1 para andando
+            if(bomberman.state != 1){
                 bomberman.state = 1;
                 bomberman.Frame_atual = 0; //reinicia o frame ao mudar o estado do meu mano
             }
@@ -1871,6 +1807,7 @@ int main()
             PlaySound(unpause);
             free(times);
         }
+        if(IsKeyPressed(KEY_I)) bomberman.keys++;
         if (IsKeyPressed(KEY_T))
         doEmote(
             emote1, emote2, emote3, emote4, emote5, emote6,
@@ -1895,19 +1832,16 @@ int main()
                         //explosão onde a bomba estava
                         Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y, &bomberman, information, world, &horde);
 
-                        //cara, ta dando um monte de erro, não aguento mais namoral, to ha 7 horas fazendo isso. 
                         //precisa dessas variaveis para controlar se a explosão de cima, baixo, esquereda ou direita bateram em algo
                         bool parou_cima = false;
                         bool parou_baixo = false;
                         bool parou_esquerda = false;
                         bool parou_direita = false;  
 
-                        //Aqui é o raio da bomba (raio de distancia, não de raio), o professor especifica que tem que ser 100x100, ou seja, 5 blocos, pq cada um é 20 né
                         for(int j = 1; j <= bomberman.bombs[i].radio; j++)
                         {
 
-                            //direção para cima 
-                            ///////////////////////////////////////////////////////////////
+                            //direção para cima
                             if(!parou_cima)
                             {
                                 if(*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) == BLOCK){
@@ -1918,9 +1852,7 @@ int main()
                                 Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y - j, &bomberman, information, world, &horde);
                                 }
                             }
-                            //////////////////////////////////////////////////////////////
                             //Direção para baixo
-                            ///////////////////////////////////////////////////////////////
                             if(!parou_baixo)
                             {
                                 if(*(*(world + bomberman.bombs[i].local.y + j) + bomberman.bombs[i].local.x) == BLOCK){
@@ -1931,9 +1863,7 @@ int main()
                                 Explosion_impact(bomberman.bombs[i].local.x, bomberman.bombs[i].local.y + j, &bomberman, information, world, &horde);
                                 }
                             }
-                            //////////////////////////////////////////////////////////////
                             //Direção para a esquerda
-                            ///////////////////////////////////////////////////////////////
                             if(!parou_esquerda){
                                 if(*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x - j) == BLOCK){
                                     parou_esquerda = true;
@@ -1943,9 +1873,7 @@ int main()
                                 Explosion_impact(bomberman.bombs[i].local.x - j, bomberman.bombs[i].local.y, &bomberman, information, world, &horde);
                                 }
                             }
-                            //////////////////////////////////////////////////////////////
                             //Direção para a direita
-                            ///////////////////////////////////////////////////////////////
                             if(!parou_direita){
                                 if(*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x + j) == BLOCK){
                                     parou_direita = true;
@@ -1955,7 +1883,6 @@ int main()
                                 Explosion_impact(bomberman.bombs[i].local.x + j, bomberman.bombs[i].local.y, &bomberman, information, world, &horde);
                                 }
                             }
-                            //////////////////////////////////////////////////////////////
                         }
                     }
                 }
@@ -1971,7 +1898,7 @@ int main()
                     if(bomberman.bombs[i].explosion_frame >= num_frames){
                         bomberman.bombs[i].active = false;
                     
-                        for(int y = 0; y < STATURE; y++){ //essa parte aqui nao parece estar otimizada
+                        for(int y = 0; y < STATURE; y++){
                             for(int x = 0; x < WIDTH; x++){
                                 if(*(*(world + y)+x)==EXPLODING_WALL){
                                     *(*(world+y)+x) = FREE;
@@ -1987,7 +1914,7 @@ int main()
             ClearBackground(RAYWHITE);
             //adicionando textura no chao inteiro
             //primeiro eu crio um triangulo do sizeList da tela
-            Rectangle sourceRec = {0.0, 0.0, WIDTH*METERS, 500}; // o motivo de ser 500 e não HEIGHT e pq ali em baixo fica a hud ne, se quiser entender melhor troca isso para "HEIGHT"
+            Rectangle sourceRec = {0.0, 0.0, WIDTH*METERS, 500};
             //esse código desenha o sprite no retangulo criado. Como o sprite(tam: 20x20) é bem menor que o retangulo (tam: tela), ele vai preenchendo até cobrir tudo
             Rectangle playerhb = {bomberman.local.x*METERS + bomberman.local.offsetX+2, bomberman.local.y*METERS + bomberman.local.offsetY+2, 16, 16};
             DrawTextureRec(floor_spr, sourceRec, origin, WHITE);
@@ -2037,14 +1964,22 @@ int main()
             }
             if(bomberman.keys > 4)
             {
-                DrawTexture(alcapaoaberto, trapdoor.xMETERS, trapdoor.yMETERS, WHITE);
+                DrawTexture(alcapaoaberto, trapdoor.x*METERS, trapdoor.y*METERS, WHITE);
                 if(bomberman.local.x == trapdoor.x && bomberman.local.y == trapdoor.y)
                 {
-                    if(!nextLevel(&bomberman, world, information, &horde, &trapdoor, argv[level]))
+                    if(bomberman.level == levels)
                     {
-                        saveRecord(bomberman, recordsound);
+                        saveRecord(bomberman, newRecord);
+                        menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores);
                     }
-                    level++;
+                    else
+                    {
+                        if(!nextLevel(&bomberman, world, information, &horde, &trapdoor, argv[bomberman.level]))
+                        {
+                            return 1;
+                        }
+                        bomberman.level++;
+                    }
                 }
             }
             else DrawTexture(alcapaofechado, trapdoor.x*METERS, trapdoor.y*METERS, WHITE);
@@ -2072,9 +2007,7 @@ int main()
                             bool para_esquerda_desenho = false;
                             bool para_direita_desenho = false;
                             for(int j = 1; j <= bomberman.bombs[i].radio; j++){
-                        //////////////////////////////////////////////////////////
                         //Para cima
-                        //////////////////////////////////////////////////////////    
                             if (!para_cima_desenho && bomberman.bombs[i].local.y - j >= 0) {
                             if (*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) == BLOCK) {
                                 para_cima_desenho = true;
@@ -2086,9 +2019,7 @@ int main()
                                 if (*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) != FREE) para_cima_desenho = true;
                             }
                         }
-                        //////////////////////////////////////////////////////////
-                        //Para baixo
-                        //////////////////////////////////////////////////////////    
+                        //Para baixo   
                             if (!para_baixo_desenho && bomberman.bombs[i].local.y + j < STATURE) {
                             if (*(*(world + bomberman.bombs[i].local.y + j) + bomberman.bombs[i].local.x) == BLOCK) {
                                 para_baixo_desenho = true;
@@ -2100,9 +2031,7 @@ int main()
                                 if (*(*(world + bomberman.bombs[i].local.y + j) + bomberman.bombs[i].local.x) != FREE) para_baixo_desenho = true;
                             }
                         }
-                        //////////////////////////////////////////////////////////
-                        //Para esquerda
-                        //////////////////////////////////////////////////////////    
+                        //Para esquerda    
                             if (!para_esquerda_desenho && bomberman.bombs[i].local.x - j >= 0) {
                             if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x - j) == BLOCK) {
                                 para_esquerda_desenho = true;
@@ -2114,9 +2043,7 @@ int main()
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x - j) != FREE) para_esquerda_desenho = true;
                             }
                         }
-                        //////////////////////////////////////////////////////////
-                        //Para direita
-                        //////////////////////////////////////////////////////////    
+                        //Para direita    
                             if (!para_direita_desenho && bomberman.bombs[i].local.x + j < WIDTH) {
                             if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x + j) == BLOCK) {
                                 para_direita_desenho = true;
@@ -2128,7 +2055,6 @@ int main()
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x + j) != FREE) para_direita_desenho = true;
                             }
                         }
-                        //////////////////////////////////////////////////////////
                         }
                     }
                     }
@@ -2221,15 +2147,15 @@ int main()
             }
 
             POINTER_LIST alive = horde.start;
-            if (GetTime() - alive->zombie.animation_timer_enemy > ENEMY_ANIM_SPEED) {
-                alive->zombie.frame_atual_walk++;
-                alive->zombie.animation_timer_enemy = GetTime();
-            }
-            if (alive->zombie.frame_atual_walk >= 4) {
-                alive->zombie.frame_atual_walk = 0;
-            }
             while(alive != NULL)
             {
+                if (GetTime() - alive->zombie.animation_timer_enemy > ENEMY_ANIM_SPEED) {
+                alive->zombie.frame_atual_walk++;
+                alive->zombie.animation_timer_enemy = GetTime();
+                }
+                if (alive->zombie.frame_atual_walk >= 4) {
+                alive->zombie.frame_atual_walk = 0;
+                }
                 enemyMove(&alive->zombie, world);
                 if(alive->zombie.local.direction == UP){
                     DrawTexture(zombie_walk_up[alive->zombie.frame_atual_walk], alive->zombie.local.x*METERS + alive->zombie.local.offsetX+2, alive->zombie.local.y*METERS + alive->zombie.local.offsetY+2, WHITE);
