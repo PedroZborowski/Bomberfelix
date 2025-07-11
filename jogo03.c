@@ -612,7 +612,7 @@ bool loadGame(player *bomberman, char **world, char *information, LIST *horde, c
 }
 
 //Recebe do usuario um nome de ate 10 digitos exibindo na tela o mesmo enquanto é escrito
-void writeName(char *name)
+void writeName(char *name, Texture2D digiteseunome)
 {
     int letter = 0;
     //Detecta as letras pressionadas
@@ -650,9 +650,9 @@ void writeName(char *name)
 
         //Insere o nome
         BeginDrawing();
-            ClearBackground(RAYWHITE);
-            DrawText("DIGITE SEU NOME", 400, 100, 50, BLACK);
-            DrawText(name, 40, 100, 50, BLACK);
+            ClearBackground(BLACK);
+            DrawTexture(digiteseunome, 0, 0, WHITE);
+            DrawText(name, 500, 200, 50, WHITE);
         EndDrawing();
 
         if(IsKeyPressed(KEY_ENTER) || letter == 10)
@@ -660,8 +660,8 @@ void writeName(char *name)
             while(!IsKeyPressed(KEY_S))
             {
                 BeginDrawing();
-                    DrawText("O NOME ESTA CORRETO?", 40, 300, 50, BLACK);
-                    DrawText("Pressione (S) para sim ou (N) para não", 40, 500, 50, BLACK);
+                    DrawText("O NOME ESTA CORRETO?", 40, 300, 50, WHITE);
+                    DrawText("Pressione (S) para sim ou (N) para não", 40, 500, 50, WHITE);
                 EndDrawing();
                 if(IsKeyPressed(KEY_N))
                 {
@@ -683,7 +683,7 @@ void writeName(char *name)
 
 //Verifica se a pontuacao do usuario devera entrar nos records
 //Caso deva salva o record em um arquivo binario
-void saveRecord(player bomberman, Sound recordsound, Texture2D *felixtrofeu)
+void saveRecord(player bomberman, Sound recordsound, Texture2D *felixtrofeu, Texture2D digiteseunome)
 {
     PlaySound(recordsound);
     bool gifdone = false;
@@ -728,7 +728,7 @@ void saveRecord(player bomberman, Sound recordsound, Texture2D *felixtrofeu)
                 DrawTexture(felixtrofeu[2], 0, 0, WHITE);
             EndDrawing();
         }
-        writeName(saving.name);
+        writeName(saving.name, digiteseunome);
         fwrite(&saving, sizeof(record), 1, file);
         strcpy(saving.name, "----------");
         saving.points = 0;
@@ -782,7 +782,7 @@ void saveRecord(player bomberman, Sound recordsound, Texture2D *felixtrofeu)
                 DrawTexture(felixtrofeu[2], 0, 0, WHITE);
             EndDrawing();
         }
-            writeName(saving.name);
+            writeName(saving.name, digiteseunome);
             fwrite(&saving, sizeof(record), 1, file);
             for(int j = position; j < 9; j++)
             {
@@ -1033,7 +1033,7 @@ void gameOver(Texture2D gameoverimg){
 }
 
 //Diminui a vida do jogador
-void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu, Sound recordsound, coordinates *trapdoor, char *argv[], Texture2D bombmenu, Texture2D telarecordes, Texture2D telacontroles, Texture2D telacriadores, Texture2D gameoverimg, Texture2D *felixtrofeu, coordinates *stairs)
+void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu, Sound recordsound, coordinates *trapdoor, char *argv[], Texture2D bombmenu, Texture2D telarecordes, Texture2D telacontroles, Texture2D telacriadores, Texture2D gameoverimg, Texture2D *felixtrofeu, coordinates *stairs, Texture2D digiteseunome)
 {
     //Se o bomberman não estiver nos frames de imortalidade, ele toma dano.
     if(GetTime() - bomberman->lastDmg >= IFRAMES){
@@ -1049,7 +1049,7 @@ void loseLife(player *bomberman, char *information, char **world, LIST *horde, S
         {
             PlaySound(loss);
             gameOver(gameoverimg);
-            saveRecord(*bomberman, recordsound, felixtrofeu);
+            saveRecord(*bomberman, recordsound, felixtrofeu, digiteseunome);
             menu(bomberman, world, information, horde, musicmenu, capa, intmenu, capamenu, trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, stairs);
         }
         else PlaySound(lostlife);
@@ -1534,7 +1534,7 @@ int main()
     CloseWindow();
     return 1;
     }
-    menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, stairs);
+    menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, &stairs);
     PlayMusicStream(musicmap1);
 
     //Carrega os sprites e telas do jogo retornando erro caso nao consiga
@@ -1554,6 +1554,7 @@ int main()
     Texture2D paredem2 = LoadTexture("Sprites/cenariom2/parede.png");
     Texture2D parededm2 = LoadTexture("Sprites/cenariom2/parede_destrutivel.png");
     Texture2D escada = LoadTexture("Sprites/cenariom2/escada.png");
+    Texture2D digiteseunome = LoadTexture("Sprites/telas/digiteseunome.png");
     Texture2D trofeu[3];
     trofeu[0] = LoadTexture("Sprites/telas/novorecorde/trofeu1.png");
     trofeu[1] = LoadTexture("Sprites/telas/novorecorde/trofeu2.png");
@@ -1630,6 +1631,11 @@ int main()
     zombie_walk_rigth[2] = LoadTexture("Sprites/inimigo/Zombie-walk-right3.png");
     zombie_walk_rigth[3] = LoadTexture("Sprites/inimigo/Zombie-walk-right4.png");
     
+    if (!IsTextureValid(digiteseunome)) {
+    puts("ERRO - Nao foi possivel achar o sprite da tela de digitar seu nome.");
+    CloseWindow();
+    return 1;
+    }
     if (!IsTextureValid(escada)) {
     puts("ERRO - Nao foi possivel achar o sprite da escada.");
     CloseWindow();
@@ -1996,12 +2002,11 @@ int main()
             double *times = (double*)malloc(sizeof(double)*MAX_BOMBS);
             PlaySound(pause);
             for(int i = 0; i < MAX_BOMBS; i++) *(times+i) = TIMER_BOMB - (GetTime() - bomberman.bombs[i].planttime);
-            pauseGame(&bomberman, information, world, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, pauseicon);
+            pauseGame(&bomberman, information, world, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, pauseicon, &stairs);
             for(int i = 0; i < MAX_BOMBS; i++) bomberman.bombs[i].planttime = GetTime() - (TIMER_BOMB - *(times+i));
             PlaySound(unpause);
             free(times);
         }
-        if(IsKeyPressed(KEY_I)) bomberman.keys++;
         if (IsKeyPressed(KEY_T))
         doEmote(
             emote1, emote2, emote3, emote4, emote5, emote6,
@@ -2178,12 +2183,12 @@ int main()
                 {
                     if(bomberman.level == levels)
                     {
-                        saveRecord(bomberman, newRecord, trofeu);
-                        menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, stairs);
+                        saveRecord(bomberman, newRecord, trofeu, digiteseunome);
+                        menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, &stairs);
                     }
                     else
                     {
-                        if(!nextLevel(&bomberman, world, information, &horde, &trapdoor, argv[bomberman.level], musicmap2, alcapao, felix_alcapao))
+                        if(!nextLevel(&bomberman, world, information, &horde, &trapdoor, argv[bomberman.level], musicmap2, alcapao, felix_alcapao, &stairs))
                         {
                             return 1;
                         }
@@ -2211,7 +2216,7 @@ int main()
 
                             DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                             Rectangle exphb = {bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                            if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs);
+                            if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs, digiteseunome);
                             bool para_cima_desenho = false;
                             bool para_baixo_desenho = false;
                             bool para_esquerda_desenho = false;
@@ -2224,7 +2229,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, WHITE);
                                 Rectangle exphb = {bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs, digiteseunome);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) != FREE) para_cima_desenho = true;
                             }
@@ -2236,7 +2241,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, WHITE);
                                 Rectangle exphb = {bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs, digiteseunome);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y + j) + bomberman.bombs[i].local.x) != FREE) para_baixo_desenho = true;
                             }
@@ -2248,7 +2253,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                                 Rectangle exphb = {(bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs, digiteseunome);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x - j) != FREE) para_esquerda_desenho = true;
                             }
@@ -2260,7 +2265,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                                 Rectangle exphb = {(bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs, digiteseunome);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x + j) != FREE) para_direita_desenho = true;
                             }
@@ -2380,11 +2385,11 @@ int main()
                     DrawTexture(zombie_walk_left[alive->zombie.frame_atual_walk], alive->zombie.local.x*METERS + alive->zombie.local.offsetX+2, alive->zombie.local.y*METERS + alive->zombie.local.offsetY+2, WHITE);
                 }
                 Rectangle enemyhb = {alive->zombie.local.x*METERS + alive->zombie.local.offsetX + 2, alive->zombie.local.y*METERS + alive->zombie.local.offsetY + 2, 16, 16};
-                if(checkHitbox(playerhb, enemyhb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs);
+                if(checkHitbox(playerhb, enemyhb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs, digiteseunome);
                 alive = alive->next;
             }
             DrawText(information, 20, 530, 50, BLACK);
-            DrawText(TextFormat("%.1lf", GetTime()), 1140, 580, 20, BLACK);
+            //DrawText(TextFormat("%.1lf", GetTime()), 1140, 580, 20, BLACK);
             for(int i = 0; i < bomberman.keys; i++){
                 DrawTexture(key_spr, 1000+i*35, 540, WHITE);
             }
@@ -2434,6 +2439,7 @@ int main()
     UnloadTexture(parededm2);
     UnloadTexture(caixam2);
     UnloadTexture(escada);
+    UnloadTexture(digiteseunome);
     UnloadSound(emote1);
     UnloadSound(emote2);
     UnloadSound(emote3);
