@@ -34,6 +34,8 @@ Thiago Barbosa da Silva - 124247625*/
 #define PLAYER_ANIM_SPEED 0.15
 #define PLAYER_ANIM_SPEED_IDLE 1
 #define ENEMY_ANIM_SPEED 0.15
+#define ANIM_SPEED_TRANS 0.15
+#define ANIM_TROFEU_SPEED 0.4
 
 #define MAX_BOMBS 3
 #define MAX_RECORDS 10
@@ -193,6 +195,9 @@ void rebootList(LIST* horde)
 bool checkHitbox(Rectangle plrhb, Rectangle otherhb){
     return CheckCollisionRecs(plrhb, otherhb);
 }
+
+//Resumo das funções de movimento: ele precisa checar se o player está exatamente no meio e, ao andar,
+//só precisa checar o quadrado na direção dele, ou se ele está entre dois quadrados e ele precisaria checar esses dois.
 
 //Movimenta o objeto para cima
 bool walkUp(coordinates *local, char **world)
@@ -410,29 +415,17 @@ bool walkLeft(coordinates *local, char **world)
     return false;
 }
 
-//Fecha o jogo
-void closeGame()
-{
-    while(!IsKeyPressed(KEY_N))
-    {
-        if(IsKeyPressed(KEY_S)) CloseWindow();
-        BeginDrawing();
-            DrawRectangle(200, 200, 300, 300, BLUE);
-            DrawText("Tem certeza de que quer sair?", 300, 300, 50, BLACK);
-            DrawText("Precisone S para sim e N para nao", 300, 450, 50, BLACK);
-        EndDrawing();
-    }
-}
-
 //Le o arquivo do nivel 1 gerando o mesmo, reseta todas as outras variaveis
-bool newGame(player *bomberman, char **world, char *information, LIST *horde, coordinates *trapdoor, char *argv[])
+bool newGame(player *bomberman, char **world, char *information, LIST *horde, coordinates *trapdoor, char *argv[], coordinates *stairs)
 {
+    //Abrir arquivo e tratamento de erros
     FILE *file = fopen(argv[0], "r");
     if(!file)
     {
         puts("ERRO - O nivel nao pode ser aberto");
         return false;
     }
+    //inicializações
     bomberman->lifes = '3';
     bomberman->points = 0;
     bomberman->keys = 0;
@@ -452,9 +445,15 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde, co
         bomberman->bombs[i].radio = 2;
     }
 
-    trapdoor.offsetX = 0;
-    trapdoor.offsetY = 0;
-    trapdoor.direction = DOWN;
+    trapdoor->offsetX = 0;
+    trapdoor->offsetY = 0;
+    trapdoor->direction = DOWN;
+
+    stairs->offsetX = 0;
+    stairs->offsetY = 0;
+    stairs->direction = DOWN;
+    stairs->x = -1;
+    stairs->y = -1;
 
     enemy zombie;
     zombie.local.offsetX = 0;
@@ -468,6 +467,7 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde, co
     squares.x = 0;
     squares.y = 0;
     char object = fgetc(file);
+    //Loop pra carregar o mapa
     while(!feof(file))
     {
         switch(object)
@@ -518,6 +518,7 @@ bool newGame(player *bomberman, char **world, char *information, LIST *horde, co
 //Salva as informacoes atuais do jogo em um arquivo binario
 bool saveGame(player bomberman, char **world, LIST *horde, coordinates trapdoor)
 {
+    //Abre o arquivo pra salvar o jogo
     FILE *file = fopen("save.dat", "wb");
     if(!file)
     {
@@ -529,6 +530,7 @@ bool saveGame(player bomberman, char **world, LIST *horde, coordinates trapdoor)
         puts("Jogo salvo com sucesso");
     }
 
+    //Escreve cada informação crua do "world" binário
     for(int y = 0; y < STATURE; y++)
     {
         for(int x = 0; x < WIDTH; x++)
@@ -536,6 +538,8 @@ bool saveGame(player bomberman, char **world, LIST *horde, coordinates trapdoor)
             fwrite(*(world + y) + x, sizeof(char), 1, file);
         }
     }
+
+    //Coloca um \n como separador para recapturar na hora da leitura, e escreve as informações dos players, do alçapão e dos inimigos.
     char split = '\n';
     fwrite(&split, sizeof(char), 1, file);
     fwrite(&bomberman, sizeof(player), 1, file);
@@ -570,6 +574,7 @@ bool loadGame(player *bomberman, char **world, char *information, LIST *horde, c
     squares.x = 0;
     squares.y = 0;
     char object;
+    //Daqui para baixo, carrega de acordo com o que foi salvo pela função acima (vai até o \n carregando o mapa depois pega o resto das informações em ordem)
     fread(&object, sizeof(char), 1, file);
     while(object != '\n')
     {
@@ -610,6 +615,7 @@ bool loadGame(player *bomberman, char **world, char *information, LIST *horde, c
 void writeName(char *name)
 {
     int letter = 0;
+    //Detecta as letras pressionadas
     while(letter >= 0)
     {
         if(IsKeyPressed(KEY_A)) {*(name+letter) = 'a'; *(name+letter+1) = '|'; letter++;}
@@ -640,8 +646,9 @@ void writeName(char *name)
         if(IsKeyPressed(KEY_Z)) {*(name+letter) = 'z'; *(name+letter+1) = '|'; letter++;}
         if(IsKeyPressed(KEY_SPACE)) {*(name+letter) = ' '; *(name+letter+1) = '|'; letter++;}
         if(IsKeyPressed(KEY_BACKSPACE)) if(letter > 0) {*(name+letter-1) = '|'; *(name+letter) = ' '; letter--;}
-        if(WindowShouldClose()) closeGame();
+        if(WindowShouldClose()) CloseWindow();
 
+        //Insere o nome
         BeginDrawing();
             ClearBackground(RAYWHITE);
             DrawText("DIGITE SEU NOME", 400, 100, 50, BLACK);
@@ -676,8 +683,13 @@ void writeName(char *name)
 
 //Verifica se a pontuacao do usuario devera entrar nos records
 //Caso deva salva o record em um arquivo binario
-void saveRecord(player bomberman, Sound recordsound)
+void saveRecord(player bomberman, Sound recordsound, Texture2D *felixtrofeu)
 {
+    PlaySound(recordsound);
+    bool gifdone = false;
+    double timer_trans = GetTime();
+    int frameatual = 0;
+
     record saving;
     saving.points = bomberman.points;
     strcpy(saving.name,"|          ");
@@ -690,14 +702,30 @@ void saveRecord(player bomberman, Sound recordsound)
         {
             puts("ERRO - O record nao pode ser salvo");
         }
-        PlaySound(recordsound);
-        while(!IsKeyPressed(KEY_ENTER))
-        {
-            if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
+        while(!gifdone){
+        if(GetTime() - timer_trans > ANIM_TROFEU_SPEED){
+            frameatual++;
+            timer_trans = GetTime();
+        }
+        if (frameatual >= 3){
+            gifdone = true;
+        }
+        BeginDrawing();
+        ClearBackground(BLACK);
+        DrawTexture(felixtrofeu[frameatual], 0, 0, WHITE);
+        EndDrawing();
+        }
+        while (!IsKeyPressed(KEY_ENTER)){
+        BeginDrawing();
+            ClearBackground(BLACK);
+            DrawTexture(felixtrofeu[2], 0, 0, WHITE);
+        EndDrawing();
+        }
+        float cont = GetTime();
+        while(GetTime() - cont < 0.167){
             BeginDrawing();
-                ClearBackground(RAYWHITE);
-                DrawText("VOCÊ É O PRIMEIRO A SALVAR SUA PONTUAÇÃO", 300, 300, 50, BLACK);
-                DrawText("Pressione ENTER para continuar", 300, 500, 50, BLACK);
+                ClearBackground(BLACK);
+                DrawTexture(felixtrofeu[2], 0, 0, WHITE);
             EndDrawing();
         }
         writeName(saving.name);
@@ -728,16 +756,32 @@ void saveRecord(player bomberman, Sound recordsound)
         {
             fseek(file, position*sizeof(record), SEEK_SET);
             PlaySound(recordsound);
-            while(!IsKeyPressed(KEY_ENTER))
-            {
-                if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
-                BeginDrawing();
-                    ClearBackground(RAYWHITE);
-                    if(!position) DrawText("PARABENS SUA PONTUAÇÃO É A MELHOR", 300, 300, 50, BLACK);
-                    else DrawText(TextFormat("PARABENS SUA PONTUAÇÃO É A %dº MELHOR", position+1), 300, 300, 50, BLACK);
-                    DrawText("Pressione ENTER para continuar", 300, 500, 50, BLACK);
-                EndDrawing();
-            }
+            while(!gifdone){
+        if(GetTime() - timer_trans > ANIM_TROFEU_SPEED){
+            frameatual++;
+            timer_trans = GetTime();
+        }
+        if (frameatual >= 3){
+            gifdone = true;
+        }
+        BeginDrawing();
+        ClearBackground(BLACK);
+        DrawTexture(felixtrofeu[frameatual], 0, 0, WHITE);
+        EndDrawing();
+        }
+        while (!IsKeyPressed(KEY_ENTER)){
+        BeginDrawing();
+            ClearBackground(BLACK);
+            DrawTexture(felixtrofeu[2], 0, 0, WHITE);
+        EndDrawing();
+        }
+        float cont = GetTime();
+        while(GetTime() - cont < 0.167){
+            BeginDrawing();
+                ClearBackground(BLACK);
+                DrawTexture(felixtrofeu[2], 0, 0, WHITE);
+            EndDrawing();
+        }
             writeName(saving.name);
             fwrite(&saving, sizeof(record), 1, file);
             for(int j = position; j < 9; j++)
@@ -759,7 +803,7 @@ void showRecords(Music musicmenu, Texture2D telarecordes)
         while(!IsKeyPressed(KEY_V))
         {
             UpdateMusicStream(musicmenu);
-            if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
+            if(WindowShouldClose() || IsKeyPressed(KEY_Q)) CloseWindow();
             BeginDrawing();
                 ClearBackground(RAYWHITE);
                 DrawTexture(telarecordes, 0, 0, WHITE);
@@ -780,11 +824,9 @@ void showRecords(Music musicmenu, Texture2D telarecordes)
         while(!IsKeyPressed(KEY_V))
         {
             UpdateMusicStream(musicmenu);
-            if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
+            if(WindowShouldClose() || IsKeyPressed(KEY_Q)) CloseWindow();
             BeginDrawing();
                 ClearBackground(RAYWHITE);
-                //DrawText("RECORDS", 50, 10, 50, RED);
-                //DrawText("Nome do jogador | pontuação", 350, 15, 40, RED);
                 DrawTexture(telarecordes, 0, 0, WHITE);
                 int position = 0;
                 for(int j = 1; position < MAX_RECORDS/2; j++)
@@ -807,10 +849,11 @@ void showRecords(Music musicmenu, Texture2D telarecordes)
 //Mostra ao usuario os controles
 void showControls(Music musicmenu, Texture2D telacontroles)
 {
+    //Prende na tela dos controles
     while(!IsKeyPressed(KEY_V))
     {
         UpdateMusicStream(musicmenu);
-        if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
+        if(WindowShouldClose() || IsKeyPressed(KEY_Q)) CloseWindow();
         BeginDrawing();
             ClearBackground(RAYWHITE);
             DrawTexture(telacontroles, 0, 0, WHITE);
@@ -821,10 +864,11 @@ void showControls(Music musicmenu, Texture2D telacontroles)
 //Mostra ao usuario os desenvolvedores
 void showDevs(Music musicmenu, Texture2D telacriadores)
 {
+    //Prende na tela dos desenvolvedores
     while(!IsKeyPressed(KEY_V))
     {
         UpdateMusicStream(musicmenu);
-        if(WindowShouldClose() || IsKeyPressed(KEY_Q)) closeGame();
+        if(WindowShouldClose() || IsKeyPressed(KEY_Q)) CloseWindow();
         BeginDrawing();
             ClearBackground(RAYWHITE);
             DrawTexture(telacriadores, 0, 0, WHITE);
@@ -878,6 +922,10 @@ void putBomb(player *bomberman, char **world, char *information)
 //Movimenta o inimigo pseudo aleatoriamente
 void enemyMove(enemy *zombie, char **world)
 {
+    //Usa uma variável de controle pra saber se ele bate na parede.
+    //Anda na direção que ele está no momento, e, se ele bater, resorteia a direção.
+    //Outro fator é o timer. Se passar de 3 segundos, ele resorteia também.
+    //Por último, ao chegar nos meios dos quadrados, ele também tem uma chance de tomar uma nova decisão.
     bool arrived = false;
     switch(zombie->local.direction)
     {
@@ -905,8 +953,9 @@ void enemyMove(enemy *zombie, char **world)
 }
 
 //Exibe o menu permitindo que o usuario selecione o que fazer
-void menu(player *bomberman, char **world, char *information, LIST *horde, Music musicmenu, Texture2D capa, Sound interacao, Texture2D capamenu, coordinates *trapdoor, char *argv[], Texture2D bombmenu, Texture2D telarecordes, Texture2D telacontroles, Texture2D telacriadores)
+void menu(player *bomberman, char **world, char *information, LIST *horde, Music musicmenu, Texture2D capa, Sound interacao, Texture2D capamenu, coordinates *trapdoor, char *argv[], Texture2D bombmenu, Texture2D telarecordes, Texture2D telacontroles, Texture2D telacriadores, coordinates *stairs)
 {
+    //Prende na capa "pressione enter para continuar"
     while (!IsKeyPressed(KEY_ENTER)){
         BeginDrawing();
             ClearBackground(RAYWHITE);
@@ -914,6 +963,7 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
             UpdateMusicStream(musicmenu);
         EndDrawing();
     }
+    //Precisa aguardar um frame para o enter não registrar logo em seguida e apertar "newgame" também.
     float cont = GetTime();
     while(GetTime() - cont < 0.167){
         BeginDrawing();
@@ -923,6 +973,7 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
         EndDrawing();
     }
     coordinates arrow = {0, 0, 0, 0, 0};
+    //Movimenta o cursor de acordo com os botões apertados. Sai do loop quando aperta enter, e então, entra em outro loop baseado na opção escolhida.
     while(!arrow.direction)
     {
         UpdateMusicStream(musicmenu);
@@ -934,7 +985,7 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
         {
             if(arrow.y == 0 && arrow.x == 0)
             {
-                if(newGame(bomberman, world, information, horde, trapdoor, argv)) break;
+                if(newGame(bomberman, world, information, horde, trapdoor, argv, stairs)) break;
             }
             if(arrow.y == 1 && arrow.x == 0)
             {
@@ -965,6 +1016,7 @@ void menu(player *bomberman, char **world, char *information, LIST *horde, Music
 
 //Mostra ao usuario a tela de derrota
 void gameOver(Texture2D gameoverimg){
+    //Usa a mesma lógica da função anterior para exibir uma tela, usando a função fade para dar um efeito de transparencia com a tela de game over.
     while (!IsKeyPressed(KEY_ENTER)){
         BeginDrawing();
             DrawRectangle(0, 0, WIDTH*METERS, HEIGHT*METERS, Fade(RED, 0.3f));
@@ -981,8 +1033,9 @@ void gameOver(Texture2D gameoverimg){
 }
 
 //Diminui a vida do jogador
-void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu, Sound recordsound, coordinates *trapdoor, char *argv[], Texture2D bombmenu, Texture2D telarecordes, Texture2D telacontroles, Texture2D telacriadores, Texture2D gameoverimg)
+void loseLife(player *bomberman, char *information, char **world, LIST *horde, Sound loss, Sound lostlife, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu, Sound recordsound, coordinates *trapdoor, char *argv[], Texture2D bombmenu, Texture2D telarecordes, Texture2D telacontroles, Texture2D telacriadores, Texture2D gameoverimg, Texture2D *felixtrofeu, coordinates *stairs)
 {
+    //Se o bomberman não estiver nos frames de imortalidade, ele toma dano.
     if(GetTime() - bomberman->lastDmg >= IFRAMES){
         bomberman->lastDmg = GetTime();
         bomberman->invincibletimer = GetTime();
@@ -996,8 +1049,8 @@ void loseLife(player *bomberman, char *information, char **world, LIST *horde, S
         {
             PlaySound(loss);
             gameOver(gameoverimg);
-            saveRecord(*bomberman, recordsound);
-            menu(bomberman, world, information, horde, musicmenu, capa, intmenu, capamenu, trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores);
+            saveRecord(*bomberman, recordsound, felixtrofeu);
+            menu(bomberman, world, information, horde, musicmenu, capa, intmenu, capamenu, trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, stairs);
         }
         else PlaySound(lostlife);
     }
@@ -1029,13 +1082,14 @@ void Explosion_impact(int x, int y, player *bomberman, char *information, char *
 }
 
 //Pausa o jogo permitindo que o usuario selecione o que fazer
-void pauseGame(player *bomberman, char *information, char **world, LIST *horde, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu, coordinates *trapdoor, char *argv[], Texture2D bombmenu, Texture2D telarecordes, Texture2D telacontroles, Texture2D telacriadores, Texture2D pauseicon)
+void pauseGame(player *bomberman, char *information, char **world, LIST *horde, Music musicmenu, Texture2D capa, Sound intmenu, Texture2D capamenu, coordinates *trapdoor, char *argv[], Texture2D bombmenu, Texture2D telarecordes, Texture2D telacontroles, Texture2D telacriadores, Texture2D pauseicon, coordinates *stairs)
 {
+    //Trava o jogo nesse loop até que aperte V (voltar). Te dá varias opções de botões.
     while(!IsKeyPressed(KEY_V))
     {
         if(IsKeyPressed(KEY_N))
         {
-            if(newGame(bomberman, world, information, horde, trapdoor, argv)) break;
+            if(newGame(bomberman, world, information, horde, trapdoor, argv, stairs)) break;
         }
         if(IsKeyPressed(KEY_C))
         {
@@ -1043,7 +1097,7 @@ void pauseGame(player *bomberman, char *information, char **world, LIST *horde, 
         }
         if(IsKeyPressed(KEY_M))
         {
-            menu(bomberman, world, information, horde, musicmenu, capa, intmenu, capamenu, trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores);
+            menu(bomberman, world, information, horde, musicmenu, capa, intmenu, capamenu, trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, stairs);
             break;
         }
         if(IsKeyPressed(KEY_S)) saveGame(*bomberman, world, horde, *trapdoor);
@@ -1057,9 +1111,9 @@ void pauseGame(player *bomberman, char *information, char **world, LIST *horde, 
             showControls(musicmenu, telacontroles);
             break;
         }
-        if(IsKeyPressed(KEY_Q) || WindowShouldClose()) closeGame();
+        if(IsKeyPressed(KEY_Q) || WindowShouldClose()) CloseWindow();
         BeginDrawing();
-            DrawTexture(pauseicon, 0, -100, WHITE);    
+            DrawTexture(pauseicon, 0, -50, WHITE);    
         EndDrawing();
     }
 }
@@ -1069,8 +1123,8 @@ void doEmote(
     Sound s1, Sound s2, Sound s3, Sound s4, Sound s5, Sound s6,
     Sound s7, Sound s8, Sound s9, Sound s10, Sound s11, player *bomberman
 ) {
+    //Realiza o emote de acordo com um número sorteado pseudoaleatoriamente, bloqueado pelo cooldown também.
     float agora = GetTime();
-
     if (agora - bomberman->lastEmoteTime >= emoteCooldown) {
         switch (GetRandomValue(1,NUM_EMOTES)) {
             case 1: PlaySound(s1); break;
@@ -1120,14 +1174,34 @@ int countlevels()
 }
 
 //Move o jogador para a proxima fase
-bool nextLevel(player *bomberman, char **world, char *information, LIST *horde, coordinates *trapdoor, char *argv)
+bool nextLevel(player *bomberman, char **world, char *information, LIST *horde, coordinates *trapdoor, char *argv, Music musicmapa2, Sound doorsound, Texture2D *felix_alcapao, coordinates *stairs)
 {
+    //Loop para exibir o gif do nível avançando.
+    PlaySound(doorsound);
+    *stairs = *trapdoor;
+    bool gifdone = false;
+    double timer_trans = GetTime();
+    int frameatual = 0;
+    while(!gifdone){
+        if(GetTime() - timer_trans > ANIM_SPEED_TRANS){
+            frameatual++;
+            timer_trans = GetTime();
+        }
+        if (frameatual >= 12){
+            gifdone = true;
+        }
+        BeginDrawing();
+        ClearBackground(BLACK);
+        DrawTexture(felix_alcapao[frameatual], 0, 0, WHITE);
+        EndDrawing();
+    }
     FILE *file = fopen(argv, "r");
     if(!file)
     {
         puts("ERRO");
         return false;
     }
+    //Reinicializa tudo, menos as informações que não devem reiniciar.
     bomberman->keys = 0;
     bomberman->local.direction = DOWN;
     bomberman->local.offsetX = 0;
@@ -1139,6 +1213,7 @@ bool nextLevel(player *bomberman, char **world, char *information, LIST *horde, 
     bomberman->animation_timer = GetTime();
     bomberman->invinciblestate = 1;
     bomberman->invincibletimer = GetTime();
+    PlayMusicStream(musicmapa2);
 
     for(int i = 0; i < MAX_BOMBS; i++){
         bomberman->bombs[i].active = false;
@@ -1234,6 +1309,7 @@ int main()
 
     //Cria as variaveis fundamentais do jogo, alocando memoria quando necessario
     coordinates trapdoor;
+    coordinates stairs;
     player bomberman;
     LIST horde;
     bootList(&horde);
@@ -1458,7 +1534,7 @@ int main()
     CloseWindow();
     return 1;
     }
-    menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores);
+    menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, stairs);
     PlayMusicStream(musicmap1);
 
     //Carrega os sprites e telas do jogo retornando erro caso nao consiga
@@ -1466,7 +1542,6 @@ int main()
     Texture2D box_spr = LoadTexture("Sprites/cenario/caixa.png");
     Texture2D explosible_spr = LoadTexture("Sprites/cenario/parede_destrutivel.png");
     Texture2D key_spr = LoadTexture("Sprites/interagiveis/chave.png");
-    Texture2D whitekey_spr = LoadTexture("Sprites/interagiveis/chavewhite.png");
     Texture2D floor_spr = LoadTexture("Sprites/cenario/chao.png");
     Texture2D in = LoadTexture("Sprites/cenario/in.png");
     Texture2D bomb_animation[2];
@@ -1474,6 +1549,28 @@ int main()
     Texture2D alcapaoaberto = LoadTexture("Sprites/cenario/alcapaoaberto.png");
     Texture2D pauseicon = LoadTexture("Sprites/telas/pausado.png");
     Texture2D gameoverimg = LoadTexture("Sprites/telas/gameover.png");
+    Texture2D caixam2 = LoadTexture("Sprites/cenariom2/caixa.png");
+    Texture2D chaom2 = LoadTexture("Sprites/cenariom2/chao.png");
+    Texture2D paredem2 = LoadTexture("Sprites/cenariom2/parede.png");
+    Texture2D parededm2 = LoadTexture("Sprites/cenariom2/parede_destrutivel.png");
+    Texture2D escada = LoadTexture("Sprites/cenariom2/escada.png");
+    Texture2D trofeu[3];
+    trofeu[0] = LoadTexture("Sprites/telas/novorecorde/trofeu1.png");
+    trofeu[1] = LoadTexture("Sprites/telas/novorecorde/trofeu2.png");
+    trofeu[2] = LoadTexture("Sprites/telas/novorecorde/trofeu3.png");
+    Texture2D felix_alcapao[12];
+    felix_alcapao[0] = LoadTexture("Sprites/telas/passounivel/felix_alcapao1.png");
+    felix_alcapao[1] = LoadTexture("Sprites/telas/passounivel/felix_alcapao2.png");
+    felix_alcapao[2] = LoadTexture("Sprites/telas/passounivel/felix_alcapao3.png");
+    felix_alcapao[3] = LoadTexture("Sprites/telas/passounivel/felix_alcapao4.png");
+    felix_alcapao[4] = LoadTexture("Sprites/telas/passounivel/felix_alcapao5.png");
+    felix_alcapao[5] = LoadTexture("Sprites/telas/passounivel/felix_alcapao6.png");
+    felix_alcapao[6] = LoadTexture("Sprites/telas/passounivel/felix_alcapao7.png");
+    felix_alcapao[7] = LoadTexture("Sprites/telas/passounivel/felix_alcapao8.png");
+    felix_alcapao[8] = LoadTexture("Sprites/telas/passounivel/felix_alcapao9.png");
+    felix_alcapao[9] = LoadTexture("Sprites/telas/passounivel/felix_alcapao10.png");
+    felix_alcapao[10] = LoadTexture("Sprites/telas/passounivel/felix_alcapao11.png");
+    felix_alcapao[11] = LoadTexture("Sprites/telas/passounivel/felix_alcapao12.png");
     bomb_animation[0] = LoadTexture("Sprites/timing/bomb_black.png");
     bomb_animation[1] = LoadTexture("Sprites/timing/bomb_red.png");
     Texture2D explosion_spr[3];
@@ -1532,6 +1629,107 @@ int main()
     zombie_walk_rigth[1] = LoadTexture("Sprites/inimigo/Zombie-walk-right2.png");
     zombie_walk_rigth[2] = LoadTexture("Sprites/inimigo/Zombie-walk-right3.png");
     zombie_walk_rigth[3] = LoadTexture("Sprites/inimigo/Zombie-walk-right4.png");
+    
+    if (!IsTextureValid(escada)) {
+    puts("ERRO - Nao foi possivel achar o sprite da escada.");
+    CloseWindow();
+    return 1;
+    }
+    if (!IsTextureValid(felix_alcapao[11])) {
+    puts("ERRO - Nao foi possivel achar o sprite felix_alcapao12.png.");
+    CloseWindow();
+    return 1;
+    }
+    if (!IsTextureValid(felix_alcapao[10])) {
+    puts("ERRO - Nao foi possivel achar o sprite felix_alcapao11.png.");
+    CloseWindow();
+    return 1;
+    }
+    if (!IsTextureValid(felix_alcapao[9])) {
+    puts("ERRO - Nao foi possivel achar o sprite felix_alcapao10.png.");
+    CloseWindow();
+    return 1;
+    }
+    if (!IsTextureValid(felix_alcapao[8])) {
+    puts("ERRO - Nao foi possivel achar o sprite felix_alcapao9.png.");
+    CloseWindow();
+    return 1;
+    }
+    if (!IsTextureValid(felix_alcapao[7])) {
+    puts("ERRO - Nao foi possivel achar o sprite felix_alcapao8.png.");
+    CloseWindow();
+    return 1;
+    }
+    if (!IsTextureValid(felix_alcapao[6])) {
+    puts("ERRO - Nao foi possivel achar o sprite felix_alcapao7.png.");
+    CloseWindow();
+    return 1;
+    }
+    if (!IsTextureValid(felix_alcapao[5])) {
+    puts("ERRO - Nao foi possivel achar o sprite felix_alcapao6.png.");
+    CloseWindow();
+    return 1;
+    }
+    if (!IsTextureValid(felix_alcapao[4])) {
+    puts("ERRO - Nao foi possivel achar o sprite felix_alcapao5.png.");
+    CloseWindow();
+    return 1;
+    }
+    if (!IsTextureValid(felix_alcapao[3])) {
+    puts("ERRO - Nao foi possivel achar o sprite felix_alcapao4.png.");
+    CloseWindow();
+    return 1;
+    }
+    if (!IsTextureValid(felix_alcapao[2])) {
+    puts("ERRO - Nao foi possivel achar o sprite felix_alcapao3.png.");
+    CloseWindow();
+    return 1;
+    }
+    if (!IsTextureValid(felix_alcapao[1])) {
+    puts("ERRO - Nao foi possivel achar o sprite felix_alcapao2.png.");
+    CloseWindow();
+    return 1;
+    }
+    if (!IsTextureValid(felix_alcapao[0])) {
+        puts("ERRO - Nao foi possivel achar o sprite da parede do primeiro png do gif de passar nível.");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(trofeu[0])) {
+        puts("ERRO - Nao foi possivel achar o sprite da parede do troféu 1");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(trofeu[1])) {
+        puts("ERRO - Nao foi possivel achar o sprite da parede do troféu 2");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(trofeu[2])) {
+        puts("ERRO - Nao foi possivel achar o sprite da parede do troféu 3");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(paredem2)) {
+        puts("ERRO - Nao foi possivel achar o sprite da parede do mapa 2");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(parededm2)) {
+        puts("ERRO - Nao foi possivel achar o sprite da parede destrutível do mapa 2");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(chaom2)) {
+        puts("ERRO - Nao foi possivel achar o sprite do chao do mapa 2");
+        CloseWindow();
+        return 1;
+    }
+    if (!IsTextureValid(caixam2)) {
+        puts("ERRO - Nao foi possivel achar o sprite da caixa do mapa 2");
+        CloseWindow();
+        return 1;
+    }
     if (!IsTextureValid(in)) {
         puts("ERRO - Nao foi possivel achar o sprite da porta");
         CloseWindow();
@@ -1724,11 +1922,6 @@ int main()
         CloseWindow();
         return 1;    
     }
-    if(!IsTextureValid(whitekey_spr)){
-        puts("Erro - Nao foi possivel achar o sprite da chave com fundo branco.");
-        CloseWindow();
-        return 1;
-    }
     if(!IsTextureValid(floor_spr))
     {
         puts("ERRO - Nao foi possivel achar o sprite do chao.");
@@ -1738,8 +1931,9 @@ int main()
 
     Vector2 origin = {0.0, 0.0};
     while(!WindowShouldClose())
-    {
-        UpdateMusicStream(musicmap1);
+    {   
+        if(bomberman.level == 1) UpdateMusicStream(musicmap1);
+        else UpdateMusicStream(musicmap2);
         bool tamovendo = false;
             if (IsKeyPressed(KEY_F11)) ToggleFullscreen();
     
@@ -1912,12 +2106,27 @@ int main()
 
         BeginDrawing();
             ClearBackground(RAYWHITE);
+            //define as texturas que vão ser carregadas baseada no mapa no qual o jogador se encontra.
+            Texture2D parede, paredequebravel, chao, caixa;
+            if(bomberman.level == 1){
+                parede = wall_spr;
+                paredequebravel = explosible_spr;
+                chao = floor_spr;
+                caixa = box_spr;
+            }
+            else{
+                parede = paredem2;
+                paredequebravel = parededm2;
+                chao = chaom2;
+                caixa = caixam2;
+            }
             //adicionando textura no chao inteiro
             //primeiro eu crio um triangulo do sizeList da tela
             Rectangle sourceRec = {0.0, 0.0, WIDTH*METERS, 500};
-            //esse código desenha o sprite no retangulo criado. Como o sprite(tam: 20x20) é bem menor que o retangulo (tam: tela), ele vai preenchendo até cobrir tudo
             Rectangle playerhb = {bomberman.local.x*METERS + bomberman.local.offsetX+2, bomberman.local.y*METERS + bomberman.local.offsetY+2, 16, 16};
-            DrawTextureRec(floor_spr, sourceRec, origin, WHITE);
+            //esse código desenha o sprite no retangulo criado. Como o sprite(tam: 20x20) é bem menor que o retangulo (tam: tela), ele vai preenchendo até cobrir tudo
+            DrawTextureRec(chao, sourceRec, origin, WHITE);
+
             for(int y = 0; y < STATURE; y++)
             {
                 for(int x = 0; x < WIDTH; x++)
@@ -1925,19 +2134,19 @@ int main()
                     switch(*(*(world + y) + x))
                     {
                         case BLOCK:
-                        DrawTexture(wall_spr, x*METERS, y*METERS, WHITE);
+                        DrawTexture(parede, x*METERS, y*METERS, WHITE);
                         break;
 
                         case WALL:
-                        DrawTexture(explosible_spr, x*METERS, y*METERS, WHITE);
+                        DrawTexture(paredequebravel, x*METERS, y*METERS, WHITE);
                         break;
 
                         case EMPTY_BOX:
-                        DrawTexture(box_spr, x*METERS, y*METERS, WHITE);
+                        DrawTexture(caixa, x*METERS, y*METERS, WHITE);
                         break;
 
                         case KEY_BOX:
-                        DrawTexture(box_spr, x*METERS, y*METERS, WHITE);
+                        DrawTexture(caixa, x*METERS, y*METERS, WHITE);
                         break;
 
                         case KEY:
@@ -1969,12 +2178,12 @@ int main()
                 {
                     if(bomberman.level == levels)
                     {
-                        saveRecord(bomberman, newRecord);
-                        menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores);
+                        saveRecord(bomberman, newRecord, trofeu);
+                        menu(&bomberman, world, information, &horde, musicmenu, capa, intMenu, capamenu, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, stairs);
                     }
                     else
                     {
-                        if(!nextLevel(&bomberman, world, information, &horde, &trapdoor, argv[bomberman.level]))
+                        if(!nextLevel(&bomberman, world, information, &horde, &trapdoor, argv[bomberman.level], musicmap2, alcapao, felix_alcapao))
                         {
                             return 1;
                         }
@@ -1983,6 +2192,7 @@ int main()
                 }
             }
             else DrawTexture(alcapaofechado, trapdoor.x*METERS, trapdoor.y*METERS, WHITE);
+            DrawTexture(escada, stairs.x*METERS, stairs.y*METERS, WHITE);
             for(int i = 0; i< MAX_BOMBS; i++){
                 if(bomberman.bombs[i].active){//se ta ativa
                     if(!bomberman.bombs[i].Exploding){//se ta plantada
@@ -2001,7 +2211,7 @@ int main()
 
                             DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                             Rectangle exphb = {bomberman.bombs[i].local.x*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                            if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg);
+                            if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs);
                             bool para_cima_desenho = false;
                             bool para_baixo_desenho = false;
                             bool para_esquerda_desenho = false;
@@ -2014,7 +2224,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, WHITE);
                                 Rectangle exphb = {bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y - j)*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y - j) + bomberman.bombs[i].local.x) != FREE) para_cima_desenho = true;
                             }
@@ -2026,7 +2236,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, WHITE);
                                 Rectangle exphb = {bomberman.bombs[i].local.x*METERS, (bomberman.bombs[i].local.y + j)*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y + j) + bomberman.bombs[i].local.x) != FREE) para_baixo_desenho = true;
                             }
@@ -2038,7 +2248,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                                 Rectangle exphb = {(bomberman.bombs[i].local.x - j)*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x - j) != FREE) para_esquerda_desenho = true;
                             }
@@ -2050,7 +2260,7 @@ int main()
                             } else {
                                 DrawTexture(explosion_spr[frame], (bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, WHITE);
                                 Rectangle exphb = {(bomberman.bombs[i].local.x + j)*METERS, bomberman.bombs[i].local.y*METERS, 20,20};
-                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg);
+                                if(checkHitbox(playerhb, exphb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs);
                                 // Se o bloco no mapa não for vazio, o desenho para também.
                                 if (*(*(world + bomberman.bombs[i].local.y) + bomberman.bombs[i].local.x + j) != FREE) para_direita_desenho = true;
                             }
@@ -2170,13 +2380,13 @@ int main()
                     DrawTexture(zombie_walk_left[alive->zombie.frame_atual_walk], alive->zombie.local.x*METERS + alive->zombie.local.offsetX+2, alive->zombie.local.y*METERS + alive->zombie.local.offsetY+2, WHITE);
                 }
                 Rectangle enemyhb = {alive->zombie.local.x*METERS + alive->zombie.local.offsetX + 2, alive->zombie.local.y*METERS + alive->zombie.local.offsetY + 2, 16, 16};
-                if(checkHitbox(playerhb, enemyhb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg);
+                if(checkHitbox(playerhb, enemyhb)) loseLife(&bomberman, information, world, &horde, losssound, lostlifesound, musicmenu, capa, intMenu, capamenu, newRecord, &trapdoor, argv, bombmenu, telarecordes, telacontroles, telacriadores, gameoverimg, trofeu, &stairs);
                 alive = alive->next;
             }
             DrawText(information, 20, 530, 50, BLACK);
             DrawText(TextFormat("%.1lf", GetTime()), 1140, 580, 20, BLACK);
             for(int i = 0; i < bomberman.keys; i++){
-                DrawTexture(whitekey_spr, 1000+i*35, 540, WHITE);
+                DrawTexture(key_spr, 1000+i*35, 540, WHITE);
             }
         EndDrawing();
     }
@@ -2203,6 +2413,8 @@ int main()
     for (int i = 0; i < 3; i++) {
         UnloadTexture(explosion_spr[i]);
     }
+    for(int i = 0; i < 12; i++) UnloadTexture(felix_alcapao[i]);
+    for(int i = 0; i < 3; i++) UnloadTexture(trofeu[i]);
     UnloadTexture(bomb_animation[0]);
     UnloadTexture(bomb_animation[1]);
     UnloadTexture(wall_spr);
@@ -2217,6 +2429,11 @@ int main()
     UnloadTexture(pauseicon);
     UnloadTexture(gameoverimg);
     UnloadTexture(in);
+    UnloadTexture(chaom2);
+    UnloadTexture(paredem2);
+    UnloadTexture(parededm2);
+    UnloadTexture(caixam2);
+    UnloadTexture(escada);
     UnloadSound(emote1);
     UnloadSound(emote2);
     UnloadSound(emote3);
